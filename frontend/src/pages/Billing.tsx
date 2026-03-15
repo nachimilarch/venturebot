@@ -1,714 +1,473 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { 
-  Plus, 
-  Wallet,
-  ArrowUpRight,
-  ArrowDownRight,
-  Zap,
-  Gift,
-  Crown,
-  Check,
-  Sparkles
+import {
+  Plus, Wallet, ArrowUpRight, ArrowDownRight,
+  Zap, Gift, Crown, Check, Sparkles,
+  MessageSquare, RefreshCw, Info,
 } from 'lucide-react';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 declare global {
-  interface Window {
-    Razorpay: any;
-  }
+  interface Window { Razorpay: any; }
 }
 
+// ─── Pricing ──────────────────────────────────────────────────────────────────
+// Meta India cost: Marketing ₹1.09 · Utility ₹0.145 · Service free
+// Blended avg (40% mktg + 60% util) ≈ ₹0.52/msg → our price gives ~2x margin
+
 const creditPackages = [
-  { 
-    id: 1, 
-    credits: 1000, 
-    price: 299, 
-    popular: false, 
+  {
+    id: 1,
+    credits: 500,
+    price: 499,
+    pricePerCredit: 0.998,
+    savings: null,
+    popular: false,
+    label: 'Starter',
     icon: Zap,
-    pricePerK: 0.299,
-    description: 'Perfect for small businesses'
+    description: 'Try it out — no big commitment',
   },
-  { 
-    id: 2, 
-    credits: 5000, 
-    price: 1299, 
-    popular: true, 
-    icon: Crown,
-    pricePerK: 0.260,
-    savings: 13,
-    description: 'Most popular for growing businesses'
-  },
-  { 
-    id: 3, 
-    credits: 10000, 
-    price: 2399, 
-    popular: false, 
-    icon: Gift,
-    pricePerK: 0.240,
+  {
+    id: 2,
+    credits: 2000,
+    price: 1599,
+    pricePerCredit: 0.80,
     savings: 20,
-    description: 'Best value for businesses'
+    popular: false,
+    label: 'Basic',
+    icon: MessageSquare,
+    description: 'Great for small campaigns',
   },
-  { 
-    id: 4, 
-    credits: 25000, 
-    price: 5499, 
-    popular: false, 
+  {
+    id: 3,
+    credits: 5000,
+    price: 3499,
+    pricePerCredit: 0.70,
+    savings: 30,
+    popular: true,
+    label: 'Growth',
+    icon: Crown,
+    description: 'Best for growing businesses',
+  },
+  {
+    id: 4,
+    credits: 15000,
+    price: 8999,
+    pricePerCredit: 0.60,
+    savings: 40,
+    popular: false,
+    label: 'Pro',
+    icon: Gift,
+    description: 'High volume at great value',
+  },
+  {
+    id: 5,
+    credits: 30000,
+    price: 15999,
+    pricePerCredit: 0.533,
+    savings: 47,
+    popular: false,
+    label: 'Enterprise',
     icon: Sparkles,
-    pricePerK: 0.220,
-    savings: 27,
-    description: 'Maximum savings for high volume'
-  }
+    description: 'Maximum volume, best price',
+  },
 ];
 
-const subscriptionPlans = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: 1499,
-    priceYearly: 14990,
-    conversations: 1000,
-    users: 3,
-    popular: false,
-    features: [
-      'Basic chatbot flows',
-      'Broadcast campaigns',
-      'WhatsApp Green Tick support',
-      '1,000 free conversations/month',
-      'Email support',
-      'Campaign analytics',
-      'Contact management'
-    ]
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    price: 2999,
-    priceYearly: 29990,
-    conversations: 5000,
-    users: 10,
-    popular: true,
-    features: [
-      'Advanced chatbot automation',
-      'AI-powered responses',
-      'CRM integration (Zoho, HubSpot, Salesforce)',
-      '5,000 free conversations/month',
-      'API access',
-      'Advanced analytics & reports',
-      'Chat assignment & routing',
-      'Priority support'
-    ]
-  },
-  {
-    id: 'business',
-    name: 'Business',
-    price: 7999,
-    priceYearly: 79990,
-    conversations: 20000,
-    users: 'Unlimited',
-    popular: false,
-    features: [
-      'Multi-agent support',
-      'Custom chatbot workflows',
-      'Advanced AI with NLP',
-      '20,000 free conversations/month',
-      'Custom integrations',
-      'Dedicated account manager',
-      'White-label options',
-      '24/7 priority support',
-      'Custom reporting & dashboards'
-    ]
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 'Custom',
-    priceYearly: 'Custom',
-    conversations: 'Unlimited',
-    users: 'Unlimited',
-    custom: true,
-    features: [
-      'Custom AI models',
-      'Enterprise-grade security',
-      'Custom SLA agreements',
-      'Volume-based discounts',
-      'Dedicated infrastructure',
-      'On-premise deployment options',
-      '24/7 dedicated support team',
-      'Training & onboarding',
-      'Custom integrations & workflows'
-    ]
-  }
-];
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const Billing: React.FC = () => {
   const { tenant, transactions, dashboardStats } = useTenant();
-  const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'credits' | 'subscription'>('credits');
 
-  // Load Razorpay script
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
+  const [isPurchaseOpen, setIsPurchaseOpen]   = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing]       = useState(false);
+
+  // ─── Razorpay ──────────────────────────────────────────────────────────────
+
+  const loadRazorpay = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      if (window.Razorpay) return resolve(true);
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload  = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.body.appendChild(s);
     });
-  };
 
   const handleCreditPurchase = async () => {
-    if (!selectedPackage) {
-      toast.error('Please select a package');
-      return;
+  if (!selectedPackage) { toast.error('Please select a package'); return; }
+  setIsProcessing(true);
+
+  try {
+    const { data } = await axios.post('/api/payments/test-purchase', {
+      packageId: selectedPackage,
+    });
+
+    if (data.success) {
+      toast.success(`${data.creditsAdded.toLocaleString()} credits added! 🎉`);
+      setIsPurchaseOpen(false);
+      setSelectedPackage(null);
+      window.location.reload();
     }
+  } catch (err: any) {
+    toast.error(err.response?.data?.error || 'Failed to add credits');
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
-    setIsProcessing(true);
-
-    try {
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        toast.error('Failed to load payment gateway');
-        return;
-      }
-
-      const orderResponse = await axios.post('/api/payments/create-order', {
-        packageId: selectedPackage
-      });
-
-      const { orderId, amount, currency, keyId, packageInfo } = orderResponse.data;
-
-      const options = {
-        key: keyId,
-        amount: amount,
-        currency: currency,
-        name: 'VentureBot',
-        description: `Purchase ${packageInfo.credits.toLocaleString()} Credits`,
-        order_id: orderId,
-        handler: async function (response: any) {
-          try {
-            const verifyResponse = await axios.post('/api/payments/verify-payment', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            if (verifyResponse.data.success) {
-              toast.success(`${verifyResponse.data.creditsAdded.toLocaleString()} credits added successfully!`);
-              setIsPurchaseOpen(false);
-              setSelectedPackage(null);
-              window.location.reload();
-            }
-          } catch (error: any) {
-            console.error('Payment verification error:', error);
-            toast.error(error.response?.data?.error || 'Payment verification failed');
-          }
-        },
-        prefill: {
-          name: tenant?.name || '',
-          email: tenant?.email || '',
-          contact: tenant?.phone || ''
-        },
-        theme: {
-          color: '#3b82f6'
-        },
-        modal: {
-          ondismiss: function() {
-            setIsProcessing(false);
-            toast.info('Payment cancelled');
-          }
-        }
-      };
-
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
-
-    } catch (error: any) {
-      console.error('Purchase error:', error);
-      toast.error(error.response?.data?.error || 'Failed to initiate payment');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSubscriptionPurchase = async () => {
-    if (!selectedPlan) {
-      toast.error('Please select a plan');
-      return;
-    }
-
-    const plan = subscriptionPlans.find(p => p.id === selectedPlan);
-    if (plan?.custom) {
-      toast.info('Please contact sales for Enterprise plan');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        toast.error('Failed to load payment gateway');
-        return;
-      }
-
-      const orderResponse = await axios.post('/api/payments/create-subscription-order', {
-        planId: selectedPlan,
-        billingCycle: billingCycle
-      });
-
-      const { orderId, amount, currency, keyId, planInfo } = orderResponse.data;
-
-      const options = {
-        key: keyId,
-        amount: amount,
-        currency: currency,
-        name: 'VentureBot',
-        description: `${planInfo.name} Plan - ${billingCycle}`,
-        order_id: orderId,
-        handler: async function (response: any) {
-          try {
-            const verifyResponse = await axios.post('/api/payments/verify-payment', {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            });
-
-            if (verifyResponse.data.success) {
-              toast.success(`${planInfo.name} plan activated successfully!`);
-              setIsPurchaseOpen(false);
-              setSelectedPlan(null);
-              window.location.reload();
-            }
-          } catch (error: any) {
-            console.error('Payment verification error:', error);
-            toast.error(error.response?.data?.error || 'Payment verification failed');
-          }
-        },
-        prefill: {
-          name: tenant?.name || '',
-          email: tenant?.email || '',
-          contact: tenant?.phone || ''
-        },
-        theme: {
-          color: '#3b82f6'
-        },
-        modal: {
-          ondismiss: function() {
-            setIsProcessing(false);
-            toast.info('Payment cancelled');
-          }
-        }
-      };
-
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
-
-    } catch (error: any) {
-      console.error('Subscription error:', error);
-      toast.error(error.response?.data?.error || 'Failed to initiate payment');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
-      case 'purchase': return <ArrowUpRight className="w-4 h-4 text-success" />;
-      case 'usage': return <ArrowDownRight className="w-4 h-4 text-warning" />;
-      case 'refund': return <ArrowUpRight className="w-4 h-4 text-chart-3" />;
-      case 'subscription': return <Crown className="w-4 h-4 text-blue-600" />;
-      default: return <Wallet className="w-4 h-4" />;
+      case 'purchase':     return <ArrowUpRight className="w-4 h-4 text-green-500" />;
+      case 'usage':        return <ArrowDownRight className="w-4 h-4 text-yellow-500" />;
+      case 'refund':       return <ArrowUpRight className="w-4 h-4 text-blue-500" />;
+      case 'subscription': return <Crown className="w-4 h-4 text-purple-500" />;
+      default:             return <Wallet className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return 'status-success';
-      case 'pending': return 'status-warning';
-      case 'failed': return 'status-error';
-      default: return 'bg-muted text-muted-foreground';
+      case 'completed': return 'bg-green-100 text-green-700';
+      case 'pending':   return 'bg-yellow-100 text-yellow-700';
+      case 'failed':    return 'bg-red-100 text-red-700';
+      default:          return 'bg-muted text-muted-foreground';
     }
   };
 
+  const selectedPkg    = creditPackages.find(p => p.id === selectedPackage);
+  const currentBalance = dashboardStats?.credits ?? 0;
+
   const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    hidden:  { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
+  };
+  const itemVariants = {
+    hidden:  { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  };
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
-      {/* Header */}
-      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+      {/* ── Page Header ── */}
+      <motion.div
+        variants={itemVariants}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+      >
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Billing & Credits</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your credits, subscriptions, and transactions
+            Manage your message credits and transaction history
           </p>
         </div>
-        <Dialog open={isPurchaseOpen} onOpenChange={setIsPurchaseOpen}>
+
+        {/* ── Buy Credits Dialog ── */}
+        <Dialog
+          open={isPurchaseOpen}
+          onOpenChange={(open) => {
+            setIsPurchaseOpen(open);
+            if (!open) setSelectedPackage(null);
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="bg-tenant-accent hover:bg-tenant-accent/90 text-tenant-accent-foreground w-fit">
               <Plus className="w-4 h-4 mr-2" />
-              Buy Credits / Subscribe
+              Buy Credits
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Choose Your Plan</DialogTitle>
+
+          {/* ── Dialog Box ── */}
+          <DialogContent className="w-[calc(100vw-2rem)] max-w-lg rounded-2xl p-0 overflow-hidden">
+
+            {/* Dialog Header */}
+            <DialogHeader className="px-5 pt-5 pb-4 border-b border-border">
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Buy Message Credits
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                1 credit = 1 WhatsApp message · Credits never expire
+              </p>
             </DialogHeader>
-            
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="pt-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="credits">Pay As You Go</TabsTrigger>
-                <TabsTrigger value="subscription">Monthly Plans</TabsTrigger>
-              </TabsList>
-              
-              {/* Credit Packages Tab */}
-              <TabsContent value="credits" className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Purchase message credits as needed. No monthly commitment.
+
+            {/* Dialog Body */}
+            <div className="px-5 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
+
+              {/* Meta cost info */}
+              <div className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2 border border-border">
+                <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Meta India rates (Jan 2026) —{' '}
+                  <span className="text-foreground font-medium">Marketing ₹1.09</span> ·{' '}
+                  <span className="text-foreground font-medium">Utility ₹0.145</span> ·{' '}
+                  <span className="text-foreground font-medium">Service Free</span>
                 </p>
-                <div className="grid grid-cols-2 gap-4">
-                  {creditPackages.map((pkg) => (
-                    <motion.div
-                      key={pkg.id}
-                      className={cn(
-                        "relative rounded-xl border-2 p-5 cursor-pointer transition-all",
-                        selectedPackage === pkg.id 
-                          ? "border-tenant-accent bg-tenant-accent/5" 
-                          : "border-border hover:border-tenant-accent/50"
-                      )}
-                      onClick={() => setSelectedPackage(pkg.id)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {pkg.popular && (
-                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-tenant-accent text-white text-xs font-medium rounded-full">
-                          Most Popular
-                        </span>
-                      )}
-                      {pkg.savings && (
-                        <span className="absolute -top-3 right-4 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                          Save {pkg.savings}%
-                        </span>
-                      )}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                          <pkg.icon className="w-5 h-5 text-tenant-accent" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-foreground">{pkg.credits.toLocaleString()}</p>
-                          <p className="text-xs text-muted-foreground">credits</p>
-                        </div>
-                      </div>
-                      <div className="flex items-baseline gap-1 mb-2">
-                        <span className="text-2xl font-bold text-foreground">₹{pkg.price}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        ₹{pkg.pricePerK.toFixed(3)} per credit
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {pkg.description}
-                      </p>
-                    </motion.div>
-                  ))}
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setIsPurchaseOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    className="bg-tenant-accent hover:bg-tenant-accent/90 text-white"
-                    disabled={!selectedPackage || isProcessing}
-                    onClick={handleCreditPurchase}
-                  >
-                    {isProcessing ? 'Processing...' : 'Proceed to Payment'}
-                  </Button>
-                </div>
-              </TabsContent>
+              </div>
 
-              {/* Subscription Plans Tab */}
-              <TabsContent value="subscription" className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    Get platform features + free conversations every month
-                  </p>
-                  <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
-                    <button
-                      className={cn(
-                        "px-3 py-1.5 text-sm rounded-md transition-colors",
-                        billingCycle === 'monthly' 
-                          ? "bg-background text-foreground shadow-sm" 
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      onClick={() => setBillingCycle('monthly')}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      className={cn(
-                        "px-3 py-1.5 text-sm rounded-md transition-colors",
-                        billingCycle === 'yearly' 
-                          ? "bg-background text-foreground shadow-sm" 
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      onClick={() => setBillingCycle('yearly')}
-                    >
-                      Yearly <span className="text-green-600 ml-1">(Save 17%)</span>
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {subscriptionPlans.map((plan) => (
-                    <motion.div
-                      key={plan.id}
-                      className={cn(
-                        "relative rounded-xl border-2 p-5 cursor-pointer transition-all",
-                        selectedPlan === plan.id 
-                          ? "border-tenant-accent bg-tenant-accent/5" 
-                          : "border-border hover:border-tenant-accent/50",
-                        plan.popular && "border-tenant-accent"
-                      )}
-                      onClick={() => !plan.custom && setSelectedPlan(plan.id)}
-                      whileHover={{ scale: plan.custom ? 1 : 1.02 }}
-                      whileTap={{ scale: plan.custom ? 1 : 0.98 }}
-                    >
-                      {plan.popular && (
-                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-tenant-accent text-white text-xs font-medium rounded-full">
-                          Most Popular
-                        </span>
-                      )}
-                      
-                      <div className="mb-4">
-                        <h3 className="text-lg font-bold text-foreground mb-1">{plan.name}</h3>
-                        <div className="flex items-baseline gap-1 mb-2">
-                          {plan.custom ? (
-                            <span className="text-2xl font-bold text-foreground">Custom</span>
-                          ) : (
-                            <>
-                              <span className="text-2xl font-bold text-foreground">
-                                ₹{billingCycle === 'yearly' 
-                                  ? (plan.priceYearly / 12).toFixed(0)
-                                  : plan.price}
+              {/* Package list */}
+              <div className="space-y-2">
+                {creditPackages.map((pkg) => (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => setSelectedPackage(pkg.id)}
+                    className={cn(
+                      'relative w-full text-left rounded-xl border-2 px-4 py-3 transition-all focus:outline-none',
+                      selectedPackage === pkg.id
+                        ? 'border-tenant-accent bg-tenant-accent/5'
+                        : 'border-border hover:border-tenant-accent/50 bg-card'
+                    )}
+                  >
+                    {/* Popular badge */}
+                    {pkg.popular && (
+                      <span className="absolute -top-2.5 left-3 px-2 py-0.5 bg-tenant-accent text-tenant-accent-foreground text-[10px] font-bold rounded-full">
+                        MOST POPULAR
+                      </span>
+                    )}
+
+                    <div className="flex items-center justify-between gap-3">
+                      {/* Left — icon + label + credits */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                          <pkg.icon className="w-4 h-4 text-tenant-accent" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-foreground">
+                              {pkg.credits.toLocaleString()} credits
+                            </p>
+                            {pkg.savings && (
+                              <span className="text-[10px] font-bold text-green-600 bg-green-100 rounded-full px-1.5 py-0.5">
+                                -{pkg.savings}%
                               </span>
-                              <span className="text-muted-foreground text-sm">/month</span>
-                            </>
-                          )}
-                        </div>
-                        {!plan.custom && billingCycle === 'yearly' && (
-                          <p className="text-xs text-green-600">
-                            Billed ₹{plan.priceYearly} annually
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            ₹{pkg.pricePerCredit.toFixed(2)}/msg · {pkg.description}
                           </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Check className="w-4 h-4 text-green-600" />
-                          <span className="text-foreground">
-                            {typeof plan.conversations === 'number' 
-                              ? `${plan.conversations.toLocaleString()} conversations/month`
-                              : 'Unlimited conversations'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Check className="w-4 h-4 text-green-600" />
-                          <span className="text-foreground">
-                            {typeof plan.users === 'number' 
-                              ? `Up to ${plan.users} users`
-                              : 'Unlimited users'}
-                          </span>
                         </div>
                       </div>
 
-                      <div className="border-t border-border pt-3">
-                        <p className="text-xs font-medium text-muted-foreground mb-2">Key Features:</p>
-                        <ul className="space-y-1.5">
-                          {plan.features.slice(0, 4).map((feature, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-xs text-muted-foreground">
-                              <Check className="w-3 h-3 text-tenant-accent mt-0.5 flex-shrink-0" />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                          {plan.features.length > 4 && (
-                            <li className="text-xs text-tenant-accent font-medium">
-                              +{plan.features.length - 4} more features
-                            </li>
+                      {/* Right — price + check */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <p className="text-base font-bold text-foreground">₹{pkg.price}</p>
+                        <div className={cn(
+                          'w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all',
+                          selectedPackage === pkg.id
+                            ? 'bg-tenant-accent border-tenant-accent'
+                            : 'border-border bg-background'
+                        )}>
+                          {selectedPackage === pkg.id && (
+                            <Check className="w-2.5 h-2.5 text-tenant-accent-foreground" />
                           )}
-                        </ul>
+                        </div>
                       </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                      {plan.custom && (
-                        <Button 
-                          variant="outline" 
-                          className="w-full mt-4"
-                          onClick={() => toast.info('Please contact sales@venturebot.com')}
-                        >
-                          Contact Sales
-                        </Button>
-                      )}
-                    </motion.div>
-                  ))}
+            {/* Dialog Footer */}
+            <div className="px-5 py-4 border-t border-border bg-muted/30">
+              {/* Summary */}
+              {selectedPkg ? (
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-tenant-accent" />
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold">{selectedPkg.credits.toLocaleString()}</span> messages
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-foreground">Total: ₹{selectedPkg.price}</p>
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground mb-3">
+                  Select a package above to continue
+                </p>
+              )}
 
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setIsPurchaseOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    className="bg-tenant-accent hover:bg-tenant-accent/90 text-white"
-                    disabled={!selectedPlan || isProcessing}
-                    onClick={handleSubscriptionPurchase}
-                  >
-                    {isProcessing ? 'Processing...' : 'Subscribe Now'}
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
+              {/* Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setIsPurchaseOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-tenant-accent hover:bg-tenant-accent/90 text-tenant-accent-foreground"
+                  disabled={!selectedPackage || isProcessing}
+                  onClick={handleCreditPurchase}
+                >
+                  {isProcessing ? (
+                    <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Processing...</>
+                  ) : (
+                    'Pay Now'
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </motion.div>
 
-      {/* Credit Balance Card */}
-      <motion.div variants={itemVariants} className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-8 text-white">
+      {/* ── Balance Card ── */}
+      <motion.div
+        variants={itemVariants}
+        className="rounded-2xl bg-tenant-accent p-6 md:p-8 text-tenant-accent-foreground"
+      >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                <Wallet className="w-6 h-6" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+                <Wallet className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-white/80 text-sm">Current Balance</p>
-                <p className="text-3xl md:text-4xl font-bold">
-                  {dashboardStats?.credits?.toLocaleString() || '0'}
-                  <span className="text-lg font-normal text-white/80 ml-2">credits</span>
+                <p className="text-sm opacity-80">Current Balance</p>
+                <p className="text-3xl font-bold">
+                  {currentBalance.toLocaleString()}
+                  <span className="text-base font-normal opacity-80 ml-2">credits</span>
                 </p>
               </div>
             </div>
-            <p className="text-white/80">
-              {tenant?.name} • {tenant?.industry}
-            </p>
+            <div className="flex items-center gap-2 opacity-80 text-sm">
+              <MessageSquare className="w-4 h-4" />
+              <span>{currentBalance.toLocaleString()} promotional messages remaining</span>
+            </div>
+            <p className="opacity-60 text-xs mt-1">{tenant?.name} · {tenant?.industry}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="bg-white/10 rounded-xl p-4">
-              <p className="text-white/80 text-sm mb-1">Messages Sent</p>
-              <p className="text-2xl font-bold">{dashboardStats?.messagesSent?.toLocaleString() || 0}</p>
+              <p className="text-xs opacity-80 mb-1">Messages Sent</p>
+              <p className="text-2xl font-bold">
+                {dashboardStats?.messagesSent?.toLocaleString() ?? 0}
+              </p>
             </div>
             <div className="bg-white/10 rounded-xl p-4">
-              <p className="text-white/80 text-sm mb-1">This Month</p>
-              <p className="text-2xl font-bold">{dashboardStats?.messagesSent?.toLocaleString() || 0}</p>
+              <p className="text-xs opacity-80 mb-1">This Month</p>
+              <p className="text-2xl font-bold">
+                {dashboardStats?.messagesSent?.toLocaleString() ?? 0}
+              </p>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Quick Info Cards */}
+      {/* ── Info Cards ── */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">No Setup Fees</h3>
-          <p className="text-foreground text-sm">Save ₹1,000-₹3,000 compared to competitors</p>
-        </div>
-        <div className="bg-card rounded-xl border border-border p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Transparent Pricing</h3>
-          <p className="text-foreground text-sm">No markup on Meta WhatsApp charges</p>
-        </div>
-        <div className="bg-card rounded-xl border border-border p-5">
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">Cancel Anytime</h3>
-          <p className="text-foreground text-sm">No long-term contracts required</p>
-        </div>
+        {[
+          {
+            title: '1 Credit = 1 Message',
+            body: 'Every WhatsApp message sent deducts exactly 1 credit — marketing, utility or auth.',
+          },
+          {
+            title: 'Credits Never Expire',
+            body: 'Purchased credits stay in your account indefinitely. No monthly burn pressure.',
+          },
+          {
+            title: 'Transparent Pricing',
+            body: 'No hidden fees. You pay for what you send, nothing more.',
+          },
+        ].map(({ title, body }) => (
+          <div key={title} className="bg-card rounded-xl border border-border p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-tenant-accent" />
+              <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+          </div>
+        ))}
       </motion.div>
 
-      {/* Transaction History */}
+      {/* ── Transaction History ── */}
       <motion.div variants={itemVariants}>
         <h2 className="text-lg font-semibold text-foreground mb-4">Transaction History</h2>
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="data-table">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
-                  <th>Transaction</th>
-                  <th>Date</th>
-                  <th>Credits</th>
-                  <th>Amount</th>
-                  <th>Status</th>
+                <tr className="border-b border-border bg-muted/50">
+                  {['Transaction', 'Date', 'Credits', 'Amount', 'Status'].map(h => (
+                    <th
+                      key={h}
+                      className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap"
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No transactions yet
+                    <td colSpan={5} className="text-center py-12 text-muted-foreground">
+                      <Wallet className="w-10 h-10 mx-auto mb-3 opacity-25" />
+                      <p className="text-sm font-medium">No transactions yet</p>
+                      <p className="text-xs mt-1">Purchase credits to get started</p>
                     </td>
                   </tr>
                 ) : (
                   transactions.map((txn) => (
-                    <tr key={txn.id}>
-                      <td>
+                    <tr
+                      key={txn.id}
+                      className="border-t border-border hover:bg-muted/40 transition-colors"
+                    >
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                             {getTransactionIcon(txn.type)}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="font-medium text-foreground capitalize">{txn.type}</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-[250px]">
+                            <p className="text-xs text-muted-foreground truncate max-w-[180px]">
                               {txn.description}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="text-muted-foreground">
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(txn.date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
+                          day: 'numeric', month: 'short', year: 'numeric',
                         })}
                       </td>
-                      <td>
+                      <td className="px-4 py-3 font-medium">
                         {txn.credits > 0 ? (
-                          <span className="font-medium text-green-600">
-                            +{txn.credits.toLocaleString()}
-                          </span>
+                          <span className="text-green-600">+{txn.credits.toLocaleString()}</span>
                         ) : txn.credits < 0 ? (
-                          <span className="font-medium text-muted-foreground">
-                            {txn.credits.toLocaleString()}
-                          </span>
+                          <span className="text-muted-foreground">{txn.credits.toLocaleString()}</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="font-medium text-foreground">
+                      <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                         ₹{Math.abs(txn.amount).toFixed(2)}
                       </td>
-                      <td>
-                        <span className={cn('status-badge capitalize', getStatusBadge(txn.status))}>
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          'text-xs font-medium rounded-full px-2.5 py-1 capitalize',
+                          getStatusBadge(txn.status)
+                        )}>
                           {txn.status}
                         </span>
                       </td>
@@ -720,6 +479,7 @@ const Billing: React.FC = () => {
           </div>
         </div>
       </motion.div>
+
     </motion.div>
   );
 };
