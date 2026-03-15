@@ -356,3 +356,32 @@ UNLOCK TABLES;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-02-23 23:38:32
+
+-- ============================================================
+-- Per-tenant WhatsApp Cloud API credentials
+-- ============================================================
+
+DROP TABLE IF EXISTS `whatsapp_config`;
+CREATE TABLE `whatsapp_config` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned NOT NULL,
+  `phone_number_id` varchar(100) NOT NULL,
+  `business_account_id` varchar(100) NOT NULL,
+  `access_token` text NOT NULL,
+  `app_id` varchar(100) DEFAULT NULL,
+  `app_secret` varchar(255) DEFAULT NULL,
+  `verify_token` varchar(255) NOT NULL,
+  `webhook_secret` varchar(255) DEFAULT NULL,
+  `display_phone_number` varchar(20) DEFAULT NULL,
+  `verified_name` varchar(100) DEFAULT NULL,
+  `quality_rating` varchar(20) DEFAULT 'GREEN',
+  `account_mode` varchar(20) DEFAULT 'LIVE',
+  `api_version` varchar(10) DEFAULT 'v21.0',
+  `is_active` tinyint(1) DEFAULT 1,
+  `is_verified` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `fk_whatsapp_config_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
