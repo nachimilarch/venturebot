@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TemplateStatus {
@@ -120,6 +121,7 @@ const CampaignFormFields: React.FC<CampaignFormFieldsProps> = ({ values, onChang
   </div>
 );
 
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const Campaigns: React.FC = () => {
@@ -136,6 +138,10 @@ const Campaigns: React.FC = () => {
   const [viewCampaign, setViewCampaign]   = useState<any | null>(null);
   const [editCampaign, setEditCampaign]   = useState<any | null>(null);
 
+  // ✅ WA config state — INSIDE component
+  const [waConfig, setWaConfig]             = useState<any>(null);
+  const [isWaConfigured, setIsWaConfigured] = useState<boolean | null>(null);
+
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const emptyForm: CampaignForm = {
@@ -143,6 +149,31 @@ const Campaigns: React.FC = () => {
   };
   const [formData, setFormData] = useState<CampaignForm>(emptyForm);
   const [editForm, setEditForm] = useState<CampaignForm>(emptyForm);
+
+
+  // ─── Load WhatsApp config from DB ────────────────────────────────────────
+
+  const fetchWaConfig = async () => {
+    try {
+      const res = await axios.get('/api/whatsapp/config');
+      if (res.data.success && res.data.config && res.data.config.is_active) {
+        setWaConfig(res.data.config);
+        setIsWaConfigured(true);
+      } else {
+        setWaConfig(null);
+        setIsWaConfigured(false);
+      }
+    } catch {
+      setWaConfig(null);
+      setIsWaConfigured(false);
+    }
+  };
+
+  // ✅ useEffect — INSIDE component
+  useEffect(() => {
+    fetchWaConfig();
+  }, []);
+
 
   // ─── Template status polling ─────────────────────────────────────────────
 
@@ -188,7 +219,8 @@ const Campaigns: React.FC = () => {
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
   }, [campaigns.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ─── Helpers ────────────────────────────────────────────────────────────
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
 
   const getTemplateBadge = (templateName: string) => {
     const status = templateStatuses[templateName];
@@ -220,7 +252,8 @@ const Campaigns: React.FC = () => {
     }
   };
 
-  // ─── Form handlers ───────────────────────────────────────────────────────
+
+  // ─── Form handlers ────────────────────────────────────────────────────────
 
   const handleInputChange = (field: string, value: string) =>
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -239,7 +272,8 @@ const Campaigns: React.FC = () => {
     setEditCampaign(campaign);
   };
 
-  // ─── Actions ────────────────────────────────────────────────────────────
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
 
   const handleCreateCampaign = async () => {
     if (!formData.name || !formData.type || !formData.targetAudience || !formData.message) {
@@ -297,6 +331,14 @@ const Campaigns: React.FC = () => {
   };
 
   const handleSendCampaign = async (campaignId: number, campaignName: string) => {
+    if (!isWaConfigured) {
+      toast.error('WhatsApp is not configured. Go to Settings → WhatsApp API first.');
+      return;
+    }
+    if (!waConfig?.is_verified) {
+      toast.error('WhatsApp credentials are not verified yet. Please verify in Settings.');
+      return;
+    }
     const campaign = campaigns.find(c => c.id === campaignId);
     if (!campaign?.templateName) {
       toast.error('No template linked to this campaign');
@@ -326,6 +368,10 @@ const Campaigns: React.FC = () => {
   };
 
   const handleSubmitTemplate = async (campaignId: number) => {
+    if (!isWaConfigured) {
+      toast.error('WhatsApp is not configured. Go to Settings → WhatsApp API first.');
+      return;
+    }
     setActionLoading(prev => ({ ...prev, [campaignId]: true }));
     try {
       const res = await axios.post(`/api/campaigns/${campaignId}/submit-template`);
@@ -357,7 +403,8 @@ const Campaigns: React.FC = () => {
     }
   };
 
-  // ─── Dropdown action resolver ────────────────────────────────────────────
+
+  // ─── Dropdown action resolver ─────────────────────────────────────────────
 
   const renderTemplateAction = (campaign: any) => {
     const tmplName   = campaign.templateName;
@@ -398,7 +445,6 @@ const Campaigns: React.FC = () => {
       );
     }
 
-    // No template, UNKNOWN status, or template not yet loaded → always show Submit
     return (
       <DropdownMenuItem
         onClick={() => handleSubmitTemplate(campaign.id)}
@@ -410,7 +456,8 @@ const Campaigns: React.FC = () => {
     );
   };
 
-  // ─── Filtered list ───────────────────────────────────────────────────────
+
+  // ─── Filtered list ────────────────────────────────────────────────────────
 
   const filteredCampaigns = campaigns.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -427,7 +474,8 @@ const Campaigns: React.FC = () => {
     visible: { opacity: 1, y: 0 },
   };
 
-  // ─── Render ──────────────────────────────────────────────────────────────
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <motion.div className="space-y-6" variants={containerVariants} initial="hidden" animate="visible">
@@ -452,7 +500,6 @@ const Campaigns: React.FC = () => {
             <RefreshCw className={cn('w-4 h-4', isPolling && 'animate-spin')} />
           </Button>
 
-          {/* Create Dialog */}
           <Dialog
             open={isCreateOpen}
             onOpenChange={(open) => { setIsCreateOpen(open); if (!open) setFormData(emptyForm); }}
@@ -482,7 +529,29 @@ const Campaigns: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Filters */}
+      {/* ✅ WhatsApp config warning — INSIDE return, after header */}
+      {isWaConfigured === false && (
+        <motion.div
+          variants={itemVariants}
+          className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-xl border border-yellow-200 dark:border-yellow-800"
+        >
+          <MessageSquare className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-yellow-800 dark:text-yellow-300">
+              WhatsApp not configured
+            </p>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400">
+              Go to{' '}
+              <a href="/settings" className="underline font-medium">
+                Settings → WhatsApp API
+              </a>{' '}
+              and save your credentials before sending campaigns.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+            {/* Filters */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -509,7 +578,7 @@ const Campaigns: React.FC = () => {
         </Select>
       </motion.div>
 
-      {/* Campaign Grid */}
+            {/* Campaign Grid */}
       <motion.div
         variants={containerVariants}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -535,20 +604,14 @@ const Campaigns: React.FC = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-
                   <DropdownMenuItem onClick={() => setViewCampaign(campaign)}>
                     <Eye className="w-4 h-4 mr-2" /> View Details
                   </DropdownMenuItem>
-
                   <DropdownMenuItem onClick={() => openEditDialog(campaign)}>
                     <Edit className="w-4 h-4 mr-2" /> Edit
                   </DropdownMenuItem>
-
                   <DropdownMenuSeparator />
-
-                  {/* Resolved template action */}
                   {renderTemplateAction(campaign)}
-
                   {campaign.status === 'active' && (
                     <DropdownMenuItem>
                       <Pause className="w-4 h-4 mr-2" /> Pause
@@ -559,9 +622,7 @@ const Campaigns: React.FC = () => {
                       <Play className="w-4 h-4 mr-2" /> Resume
                     </DropdownMenuItem>
                   )}
-
                   <DropdownMenuSeparator />
-
                   <DropdownMenuItem
                     className="text-destructive"
                     onClick={() => handleDeleteCampaign(campaign.id)}
@@ -570,7 +631,6 @@ const Campaigns: React.FC = () => {
                     <Trash2 className="w-4 h-4 mr-2" />
                     {actionLoading[campaign.id] ? 'Deleting...' : 'Delete'}
                   </DropdownMenuItem>
-
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -612,7 +672,7 @@ const Campaigns: React.FC = () => {
         </motion.div>
       )}
 
-      {/* ── View Dialog ──────────────────────────────────────────────────────── */}
+      {/* ── View Dialog ── */}
       <Dialog open={!!viewCampaign} onOpenChange={() => setViewCampaign(null)}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
@@ -665,7 +725,7 @@ const Campaigns: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Edit Dialog ──────────────────────────────────────────────────────── */}
+      {/* ── Edit Dialog ── */}
       <Dialog
         open={!!editCampaign}
         onOpenChange={(open) => { if (!open) setEditCampaign(null); }}

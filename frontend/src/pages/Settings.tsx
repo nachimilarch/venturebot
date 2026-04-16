@@ -57,7 +57,9 @@ import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { toast } from 'sonner';
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
 
 interface WhatsAppConfig {
   id?: number;
@@ -73,28 +75,33 @@ interface WhatsAppConfig {
   api_version: string;
   is_active: boolean;
   is_verified: boolean;
-  quality_rating?: string;
-  account_mode?: string;
+  quality_rating: string;
+  account_mode:   string;
 }
 
+
 const EMPTY_CONFIG: WhatsAppConfig = {
-  phone_number_id: '',
-  business_account_id: '',
-  access_token: '',
-  app_id: '',
-  app_secret: '',
-  verify_token: '',
-  webhook_secret: '',
+  phone_number_id:      '',
+  business_account_id:  '',
+  access_token:         '',
+  app_id:               '',
+  app_secret:           '',
+  verify_token:         '',
+  webhook_secret:       '',
   display_phone_number: '',
-  verified_name: '',
-  api_version: 'v21.0',
-  is_active: true,
-  is_verified: false,
+  verified_name:        '',
+  quality_rating:       'GREEN',  // ✅ DB default
+  account_mode:         'LIVE',   // ✅ DB default
+  api_version:          'v21.0',  // ✅ DB default
+  is_active:            true,     // ✅ DB default 1
+  is_verified:          false,    // ✅ DB default 0
 };
+
 
 // ─── Helper: masked token display ─────────────────────────────────────────────
 const maskToken = (val: string) =>
   val.length > 10 ? val.slice(0, 6) + '••••••••••••' + val.slice(-4) : '••••••••••••';
+
 
 // ─── Tooltip Helper ───────────────────────────────────────────────────────────
 const FieldHint: React.FC<{ text: string }> = ({ text }) => (
@@ -108,7 +115,9 @@ const FieldHint: React.FC<{ text: string }> = ({ text }) => (
   </TooltipProvider>
 );
 
+
 // ─── Main Component ───────────────────────────────────────────────────────────
+
 
 const Settings: React.FC = () => {
   const { tenant, staff } = useTenant();
@@ -116,15 +125,17 @@ const Settings: React.FC = () => {
   const [staffForm, setStaffForm] = useState({ name: '', email: '', role: '' });
   const [isAddingStaff, setIsAddingStaff] = useState(false);
 
+
   // Company
   const [companySettings, setCompanySettings] = useState({
-    name: tenant?.name || '',
-    email: (tenant as any)?.email || '',
-    phone: (tenant as any)?.phone || '',
-    address: (tenant as any)?.address || '',
-    industry: tenant?.industry || '',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    industry: '',
   });
   const [isSavingCompany, setIsSavingCompany] = useState(false);
+
 
   // Notifications
   const [notifications, setNotifications] = useState({
@@ -136,6 +147,7 @@ const Settings: React.FC = () => {
     billingAlerts: true,
   });
 
+
   // WhatsApp Config state
   const [waConfig, setWaConfig] = useState<WhatsAppConfig>(EMPTY_CONFIG);
   const [waExists, setWaExists] = useState(false);
@@ -143,13 +155,16 @@ const Settings: React.FC = () => {
   const [isSavingWa, setIsSavingWa] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
 
+
   // Visibility toggles
   const [showToken, setShowToken] = useState(false);
   const [showAppSecret, setShowAppSecret] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
 
+
   // Webhook URL (read-only, shown to user for Meta setup)
   const [webhookUrl, setWebhookUrl] = useState('');
+
 
   // ── Animation variants ────────────────────────────────────────────────────
   const containerVariants = {
@@ -161,20 +176,22 @@ const Settings: React.FC = () => {
     visible: { opacity: 1, y: 0 },
   };
 
+
   // ── Sync tenant into company form ─────────────────────────────────────────
   useEffect(() => {
     if (tenant) {
       setCompanySettings({
-        name: tenant.name || '',
-        email: (tenant as any).email || '',
-        phone: (tenant as any).phone || '',
-        address: (tenant as any).address || '',
-        industry: tenant.industry || '',
+        name:     tenant.name                   || '',
+        email:    (tenant as any).email         || '',
+        phone:    (tenant as any).phone         || '',
+        address:  (tenant as any).address       || '',
+        industry: tenant.industry               || '',
       });
     }
   }, [tenant]);
 
-  // ── Load WhatsApp config on mount ─────────────────────────────────────────
+
+  // ── Load WhatsApp config + build webhook URL on mount ────────────────────
   useEffect(() => {
     fetchWaConfig();
     const base =
@@ -184,25 +201,50 @@ const Settings: React.FC = () => {
     setWebhookUrl(`${base}/webhook`);
   }, []);
 
+
+  // ── Fetch & populate WhatsApp config ─────────────────────────────────────
   const fetchWaConfig = async () => {
-    setIsLoadingWa(true);
-    try {
-      const res = await axios.get('/api/whatsapp/config');
-      if (res.data.success && res.data.data) {
-        setWaConfig({ ...EMPTY_CONFIG, ...res.data.data });
-        setWaExists(true);
-      } else {
-        setWaConfig(EMPTY_CONFIG);
-        setWaExists(false);
-      }
-    } catch (err: any) {
-      // 404 = not configured yet — that's fine
+  setIsLoadingWa(true);
+  try {
+    const res = await axios.get('/api/whatsapp/config');
+
+    // ✅ API returns res.data.config, NOT res.data.data
+    if (res.data.success && res.data.config) {
+      const raw = res.data.config;
+
+      const normalised: WhatsAppConfig = {
+        ...EMPTY_CONFIG,
+        ...raw,
+        is_active:            raw.is_active   === true || raw.is_active   === 1,
+        is_verified:          raw.is_verified === true || raw.is_verified === 1,
+        phone_number_id:      raw.phone_number_id      ?? '',
+        business_account_id:  raw.business_account_id  ?? '',
+        access_token:         raw.access_token         ?? '',
+        app_id:               raw.app_id               ?? '',
+        app_secret:           raw.app_secret           ?? '',
+        verify_token:         raw.verify_token         ?? '',
+        webhook_secret:       raw.webhook_secret       ?? '',
+        display_phone_number: raw.display_phone_number ?? '',
+        verified_name:        raw.verified_name        ?? '',
+        quality_rating:       raw.quality_rating       ?? 'GREEN',
+        account_mode:         raw.account_mode         ?? 'LIVE',
+        api_version:          raw.api_version          ?? 'v21.0',
+      };
+
+      setWaConfig(normalised);
+      setWaExists(true);
+    } else {
       setWaConfig(EMPTY_CONFIG);
       setWaExists(false);
-    } finally {
-      setIsLoadingWa(false);
     }
-  };
+  } catch {
+    setWaConfig(EMPTY_CONFIG);
+    setWaExists(false);
+  } finally {
+    setIsLoadingWa(false);
+  }
+};
+
 
   // ── Company save ──────────────────────────────────────────────────────────
   const handleSaveCompany = async () => {
@@ -217,6 +259,7 @@ const Settings: React.FC = () => {
     }
   };
 
+
   // ── WhatsApp: verify credentials against Meta Graph API ──────────────────
   const handleVerify = async () => {
     if (!waConfig.phone_number_id || !waConfig.access_token) {
@@ -227,15 +270,15 @@ const Settings: React.FC = () => {
     try {
       const res = await axios.post('/api/whatsapp/verify-config', {
         phone_number_id: waConfig.phone_number_id,
-        access_token: waConfig.access_token,
-        api_version: waConfig.api_version,
+        access_token:    waConfig.access_token,
+        api_version:     waConfig.api_version,
       });
       if (res.data.success) {
         setWaConfig(prev => ({
           ...prev,
-          display_phone_number: res.data.phone_number || prev.display_phone_number,
-          verified_name: res.data.verified_name || prev.verified_name,
-          quality_rating: res.data.quality_rating || prev.quality_rating,
+          display_phone_number: res.data.phone_number   || prev.display_phone_number,
+          verified_name:        res.data.verified_name  || prev.verified_name,
+          quality_rating:       res.data.quality_rating || prev.quality_rating,
           is_verified: true,
         }));
         toast.success(
@@ -254,13 +297,14 @@ const Settings: React.FC = () => {
     }
   };
 
+
   // ── WhatsApp: save config to DB ───────────────────────────────────────────
   const handleSaveWa = async () => {
     const required: Array<{ key: keyof WhatsAppConfig; label: string }> = [
-      { key: 'phone_number_id', label: 'Phone Number ID' },
-      { key: 'business_account_id', label: 'WhatsApp Business Account ID' },
-      { key: 'access_token', label: 'Permanent Access Token' },
-      { key: 'verify_token', label: 'Webhook Verify Token' },
+      { key: 'phone_number_id',       label: 'Phone Number ID' },
+      { key: 'business_account_id',   label: 'WhatsApp Business Account ID' },
+      { key: 'access_token',          label: 'Permanent Access Token' },
+      { key: 'verify_token',          label: 'Webhook Verify Token' },
     ];
     for (const { key, label } of required) {
       if (!waConfig[key]) {
@@ -271,20 +315,38 @@ const Settings: React.FC = () => {
 
     setIsSavingWa(true);
     try {
+      const payload = {
+        phone_number_id:      waConfig.phone_number_id,
+        business_account_id:  waConfig.business_account_id,
+        access_token:         waConfig.access_token,
+        app_id:               waConfig.app_id               || null,
+        app_secret:           waConfig.app_secret           || null,
+        verify_token:         waConfig.verify_token,
+        webhook_secret:       waConfig.webhook_secret       || null,
+        display_phone_number: waConfig.display_phone_number || null,
+        verified_name:        waConfig.verified_name        || null,
+        quality_rating:       waConfig.quality_rating       || 'GREEN',
+        account_mode:         waConfig.account_mode         || 'LIVE',
+        api_version:          waConfig.api_version          || 'v21.0',
+        is_active:            waConfig.is_active   ? 1 : 0,
+        is_verified:          waConfig.is_verified ? 1 : 0,
+      };
+
       if (waExists) {
-        await axios.put('/api/whatsapp/config', waConfig);
+        await axios.put('/api/whatsapp/config', payload);
       } else {
-        await axios.post('/api/whatsapp/config', waConfig);
+        await axios.post('/api/whatsapp/config', payload);
         setWaExists(true);
       }
       toast.success('WhatsApp configuration saved!');
-      await fetchWaConfig();
+      await fetchWaConfig();          // re-fetch to confirm DB round-trip
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to save WhatsApp config');
     } finally {
       setIsSavingWa(false);
     }
   };
+
 
   // ── Auto-generate verify token ────────────────────────────────────────────
   const generateVerifyToken = () => {
@@ -294,11 +356,13 @@ const Settings: React.FC = () => {
     toast.success('Verify token generated');
   };
 
+
   // ── Copy helper ───────────────────────────────────────────────────────────
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied`);
   };
+
 
   // ── Add staff ─────────────────────────────────────────────────────────────
   const handleAddStaff = async () => {
@@ -319,9 +383,11 @@ const Settings: React.FC = () => {
     }
   };
 
+
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
+
 
   return (
     <motion.div
@@ -337,6 +403,7 @@ const Settings: React.FC = () => {
           Manage your company profile and WhatsApp API configuration
         </p>
       </motion.div>
+
 
       <Tabs defaultValue="api">
         <motion.div variants={itemVariants}>
@@ -364,6 +431,7 @@ const Settings: React.FC = () => {
           </TabsList>
         </motion.div>
 
+
         {/* ───────────────────────── Company ───────────────────────────── */}
         <TabsContent value="company" className="mt-6">
           <motion.div
@@ -376,36 +444,46 @@ const Settings: React.FC = () => {
                 <Label>Company Name</Label>
                 <Input
                   value={companySettings.name}
-                  onChange={e => setCompanySettings({ ...companySettings, name: e.target.value })}
+                  onChange={e =>
+                    setCompanySettings({ ...companySettings, name: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Email Address</Label>
                 <Input
                   type="email"
-                                    value={companySettings.email}
-                  onChange={e => setCompanySettings({ ...companySettings, email: e.target.value })}
+                  value={companySettings.email}
+                  onChange={e =>
+                    setCompanySettings({ ...companySettings, email: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Phone Number</Label>
                 <Input
                   value={companySettings.phone}
-                  onChange={e => setCompanySettings({ ...companySettings, phone: e.target.value })}
+                  onChange={e =>
+                    setCompanySettings({ ...companySettings, phone: e.target.value })
+                  }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Industry</Label>
                 <Input
                   value={companySettings.industry}
-                  onChange={e => setCompanySettings({ ...companySettings, industry: e.target.value })}
+                  onChange={e =>
+                    setCompanySettings({ ...companySettings, industry: e.target.value })
+                  }
                 />
               </div>
               <div className="md:col-span-2 space-y-2">
                 <Label>Address</Label>
                 <Input
                   value={companySettings.address}
-                  onChange={e => setCompanySettings({ ...companySettings, address: e.target.value })}
+                  onChange={e =>
+                    setCompanySettings({ ...companySettings, address: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -415,14 +493,17 @@ const Settings: React.FC = () => {
                 disabled={isSavingCompany}
                 className="bg-tenant-accent hover:bg-tenant-accent/90 text-tenant-accent-foreground"
               >
-                {isSavingCompany
-                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  : <Save className="w-4 h-4 mr-2" />}
+                {isSavingCompany ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
                 Save Changes
               </Button>
             </div>
           </motion.div>
         </TabsContent>
+
 
         {/* ───────────────────────── Team ──────────────────────────────── */}
         <TabsContent value="team" className="mt-6">
@@ -433,7 +514,9 @@ const Settings: React.FC = () => {
             <div className="p-6 border-b border-border flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Team Members</h2>
-                <p className="text-sm text-muted-foreground">Manage your sales team and agents</p>
+                <p className="text-sm text-muted-foreground">
+                  Manage your sales team and agents
+                </p>
               </div>
               <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
                 <DialogTrigger asChild>
@@ -452,7 +535,9 @@ const Settings: React.FC = () => {
                       <Input
                         placeholder="John Doe"
                         value={staffForm.name}
-                        onChange={e => setStaffForm({ ...staffForm, name: e.target.value })}
+                        onChange={e =>
+                          setStaffForm({ ...staffForm, name: e.target.value })
+                        }
                       />
                     </div>
                     <div className="space-y-2">
@@ -461,14 +546,18 @@ const Settings: React.FC = () => {
                         type="email"
                         placeholder="john@company.com"
                         value={staffForm.email}
-                        onChange={e => setStaffForm({ ...staffForm, email: e.target.value })}
+                        onChange={e =>
+                          setStaffForm({ ...staffForm, email: e.target.value })
+                        }
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Role</Label>
                       <Select
                         value={staffForm.role}
-                        onValueChange={val => setStaffForm({ ...staffForm, role: val })}
+                        onValueChange={val =>
+                          setStaffForm({ ...staffForm, role: val })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select role" />
@@ -481,7 +570,10 @@ const Settings: React.FC = () => {
                       </Select>
                     </div>
                     <div className="flex justify-end gap-3">
-                      <Button variant="outline" onClick={() => setIsAddStaffOpen(false)}>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddStaffOpen(false)}
+                      >
                         Cancel
                       </Button>
                       <Button
@@ -489,9 +581,11 @@ const Settings: React.FC = () => {
                         disabled={isAddingStaff}
                         className="bg-tenant-accent hover:bg-tenant-accent/90 text-tenant-accent-foreground"
                       >
-                        {isAddingStaff
-                          ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          : <Plus className="w-4 h-4 mr-2" />}
+                        {isAddingStaff ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="w-4 h-4 mr-2" />
+                        )}
                         Add Member
                       </Button>
                     </div>
@@ -524,19 +618,23 @@ const Settings: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td>
+                                            <td>
                         <span className="capitalize text-foreground">{member.role}</span>
                       </td>
                       <td>
-                        <span className={cn(
-                          'status-badge',
-                          member.status === 'active' ? 'status-success' : 'status-error'
-                        )}>
+                        <span
+                          className={cn(
+                            'status-badge',
+                            member.status === 'active' ? 'status-success' : 'status-error'
+                          )}
+                        >
                           {member.status}
                         </span>
                       </td>
                       <td className="text-muted-foreground">
-                        {new Date(member.joinedAt).toLocaleDateString()}
+                        {member.joinedAt
+                          ? new Date(member.joinedAt).toLocaleDateString()
+                          : '—'}
                       </td>
                       <td>
                         <DropdownMenu>
@@ -576,6 +674,7 @@ const Settings: React.FC = () => {
           </motion.div>
         </TabsContent>
 
+
         {/* ───────────────────────── Notifications ─────────────────────── */}
         <TabsContent value="notifications" className="mt-6">
           <motion.div
@@ -587,12 +686,36 @@ const Settings: React.FC = () => {
             </h2>
             <div className="space-y-1">
               {[
-                { key: 'emailNotifications', label: 'Email Notifications', desc: 'Receive updates via email' },
-                { key: 'smsNotifications', label: 'SMS Notifications', desc: 'Receive updates via SMS' },
-                { key: 'campaignAlerts', label: 'Campaign Alerts', desc: 'Get notified about campaign performance' },
-                { key: 'leadAlerts', label: 'New Lead Alerts', desc: 'Get notified when new leads come in' },
-                { key: 'appointmentReminders', label: 'Appointment Reminders', desc: 'Reminders before scheduled appointments' },
-                { key: 'billingAlerts', label: 'Billing Alerts', desc: 'Notifications about credits and billing' },
+                {
+                  key: 'emailNotifications',
+                  label: 'Email Notifications',
+                  desc: 'Receive updates via email',
+                },
+                {
+                  key: 'smsNotifications',
+                  label: 'SMS Notifications',
+                  desc: 'Receive updates via SMS',
+                },
+                {
+                  key: 'campaignAlerts',
+                  label: 'Campaign Alerts',
+                  desc: 'Get notified about campaign performance',
+                },
+                {
+                  key: 'leadAlerts',
+                  label: 'New Lead Alerts',
+                  desc: 'Get notified when new leads come in',
+                },
+                {
+                  key: 'appointmentReminders',
+                  label: 'Appointment Reminders',
+                  desc: 'Reminders before scheduled appointments',
+                },
+                {
+                  key: 'billingAlerts',
+                  label: 'Billing Alerts',
+                  desc: 'Notifications about credits and billing',
+                },
               ].map(item => (
                 <div
                   key={item.key}
@@ -614,6 +737,7 @@ const Settings: React.FC = () => {
           </motion.div>
         </TabsContent>
 
+
         {/* ───────────────────────── WhatsApp API ──────────────────────── */}
         <TabsContent value="api" className="mt-6 space-y-5">
 
@@ -622,7 +746,9 @@ const Settings: React.FC = () => {
             {isLoadingWa ? (
               <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl border border-border">
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Loading WhatsApp configuration…</span>
+                <span className="text-sm text-muted-foreground">
+                  Loading WhatsApp configuration…
+                </span>
               </div>
             ) : waExists && waConfig.is_verified ? (
               <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/30 rounded-xl border border-green-200 dark:border-green-800">
@@ -659,7 +785,8 @@ const Settings: React.FC = () => {
                     Credentials saved but not verified
                   </p>
                   <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                    Click <strong>Verify Connection</strong> below to test your credentials against Meta.
+                    Click <strong>Verify Connection</strong> below to test your credentials
+                    against Meta.
                   </p>
                 </div>
               </div>
@@ -671,48 +798,31 @@ const Settings: React.FC = () => {
                     WhatsApp not configured
                   </p>
                   <p className="text-sm text-blue-700 dark:text-blue-400">
-                    Fill in your Meta / WhatsApp Cloud API credentials below to start sending messages.
+                    Fill in your Meta / WhatsApp Cloud API credentials below to start sending
+                    messages.
                   </p>
                 </div>
               </div>
             )}
           </motion.div>
 
-          {/* ── Setup guide steps ── */}
-          <motion.div variants={itemVariants} className="bg-muted/40 rounded-xl border border-border p-4">
-            <p className="text-sm font-semibold text-foreground mb-3">
-              Quick Setup Guide
-            </p>
-            <ol className="space-y-1.5 text-sm text-muted-foreground list-none">
-              {[
-                'Go to developers.facebook.com → My Apps → Create App → Business type',
-                'Add "WhatsApp" product to your app',
-                'In WhatsApp → Getting Started, copy your Phone Number ID and Test Phone Number',
-                'In WhatsApp → Configuration, add the Webhook URL below and your Verify Token',
-                'Subscribe to messages, message_deliveries, message_reads webhook fields',
-                'In System Users (Business Manager), generate a Permanent Token with whatsapp_business_messaging permission',
-                'Paste all credentials here and click Verify Connection, then Save',
-              ].map((step, i) => (
-                <li>
-                  <span className="w-5 h-5 rounded-full bg-tenant-accent/20 text-tenant-accent text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
-          </motion.div>
-
           {/* ── Webhook URL (read-only) ── */}
-          <motion.div variants={itemVariants} className="bg-card rounded-xl border border-border p-6 space-y-3">
+          <motion.div
+            variants={itemVariants}
+            className="bg-card rounded-xl border border-border p-6 space-y-3"
+          >
             <div>
               <h3 className="font-semibold text-foreground">Webhook URL</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Paste this URL in your Meta App → WhatsApp → Configuration → Webhook URL
               </p>
             </div>
             <div className="flex gap-2">
-              <Input value={webhookUrl} readOnly className="flex-1 font-mono text-sm bg-muted" />
+              <Input
+                value={webhookUrl}
+                readOnly
+                className="flex-1 font-mono text-sm bg-muted"
+              />
               <Button variant="outline" onClick={() => copy(webhookUrl, 'Webhook URL')}>
                 <Copy className="w-4 h-4" />
               </Button>
@@ -720,7 +830,10 @@ const Settings: React.FC = () => {
           </motion.div>
 
           {/* ── Credentials form ── */}
-          <motion.div variants={itemVariants} className="bg-card rounded-xl border border-border p-6 space-y-6">
+          <motion.div
+            variants={itemVariants}
+            className="bg-card rounded-xl border border-border p-6 space-y-6"
+          >
             <h3 className="font-semibold text-foreground">API Credentials</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -734,7 +847,9 @@ const Settings: React.FC = () => {
                 <Input
                   placeholder="e.g. 123456789012345"
                   value={waConfig.phone_number_id}
-                  onChange={e => setWaConfig(prev => ({ ...prev, phone_number_id: e.target.value.trim() }))}
+                  onChange={e =>
+                    setWaConfig(prev => ({ ...prev, phone_number_id: e.target.value.trim() }))
+                  }
                 />
               </div>
 
@@ -747,7 +862,12 @@ const Settings: React.FC = () => {
                 <Input
                   placeholder="e.g. 987654321098765"
                   value={waConfig.business_account_id}
-                  onChange={e => setWaConfig(prev => ({ ...prev, business_account_id: e.target.value.trim() }))}
+                  onChange={e =>
+                    setWaConfig(prev => ({
+                      ...prev,
+                      business_account_id: e.target.value.trim(),
+                    }))
+                  }
                 />
               </div>
 
@@ -760,7 +880,9 @@ const Settings: React.FC = () => {
                 <Input
                   placeholder="e.g. 1234567890"
                   value={waConfig.app_id}
-                  onChange={e => setWaConfig(prev => ({ ...prev, app_id: e.target.value.trim() }))}
+                  onChange={e =>
+                    setWaConfig(prev => ({ ...prev, app_id: e.target.value.trim() }))
+                  }
                 />
               </div>
 
@@ -772,14 +894,18 @@ const Settings: React.FC = () => {
                 </Label>
                 <Select
                   value={waConfig.api_version}
-                  onValueChange={val => setWaConfig(prev => ({ ...prev, api_version: val }))}
+                  onValueChange={val =>
+                    setWaConfig(prev => ({ ...prev, api_version: val }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {['v22.0', 'v21.0', 'v20.0', 'v19.0', 'v18.0'].map(v => (
-                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                      <SelectItem key={v} value={v}>
+                        {v}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -796,7 +922,9 @@ const Settings: React.FC = () => {
                     type={showToken ? 'text' : 'password'}
                     placeholder="EAAxxxxxxxxxxxxxxxxxxxxxxx"
                     value={waConfig.access_token}
-                    onChange={e => setWaConfig(prev => ({ ...prev, access_token: e.target.value.trim() }))}
+                    onChange={e =>
+                      setWaConfig(prev => ({ ...prev, access_token: e.target.value.trim() }))
+                    }
                     className="flex-1 font-mono text-sm"
                   />
                   <Button
@@ -805,7 +933,11 @@ const Settings: React.FC = () => {
                     onClick={() => setShowToken(v => !v)}
                     title={showToken ? 'Hide token' : 'Show token'}
                   >
-                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showToken ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </Button>
                   {waConfig.access_token && (
                     <Button
@@ -826,11 +958,13 @@ const Settings: React.FC = () => {
                   <FieldHint text="Found in Meta App Dashboard → Settings → Basic. Used to verify webhook payloads." />
                 </Label>
                 <div className="flex gap-2">
-                  <Input
+                                    <Input
                     type={showAppSecret ? 'text' : 'password'}
                     placeholder="App secret (optional)"
                     value={waConfig.app_secret}
-                    onChange={e => setWaConfig(prev => ({ ...prev, app_secret: e.target.value.trim() }))}
+                    onChange={e =>
+                      setWaConfig(prev => ({ ...prev, app_secret: e.target.value.trim() }))
+                    }
                     className="flex-1 font-mono text-sm"
                   />
                   <Button
@@ -838,7 +972,11 @@ const Settings: React.FC = () => {
                     size="icon"
                     onClick={() => setShowAppSecret(v => !v)}
                   >
-                    {showAppSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showAppSecret ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -854,7 +992,12 @@ const Settings: React.FC = () => {
                     type={showWebhookSecret ? 'text' : 'password'}
                     placeholder="Webhook secret (optional)"
                     value={waConfig.webhook_secret}
-                    onChange={e => setWaConfig(prev => ({ ...prev, webhook_secret: e.target.value.trim() }))}
+                    onChange={e =>
+                      setWaConfig(prev => ({
+                        ...prev,
+                        webhook_secret: e.target.value.trim(),
+                      }))
+                    }
                     className="flex-1 font-mono text-sm"
                   />
                   <Button
@@ -862,7 +1005,11 @@ const Settings: React.FC = () => {
                     size="icon"
                     onClick={() => setShowWebhookSecret(v => !v)}
                   >
-                    {showWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showWebhookSecret ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -877,10 +1024,16 @@ const Settings: React.FC = () => {
                   <Input
                     placeholder="e.g. vb_abc123xyz"
                     value={waConfig.verify_token}
-                    onChange={e => setWaConfig(prev => ({ ...prev, verify_token: e.target.value.trim() }))}
+                    onChange={e =>
+                      setWaConfig(prev => ({ ...prev, verify_token: e.target.value.trim() }))
+                    }
                     className="flex-1 font-mono text-sm"
                   />
-                  <Button variant="outline" onClick={generateVerifyToken} title="Auto-generate">
+                  <Button
+                    variant="outline"
+                    onClick={generateVerifyToken}
+                    title="Auto-generate"
+                  >
                     <RefreshCw className="w-4 h-4 mr-1" />
                     Generate
                   </Button>
@@ -898,38 +1051,51 @@ const Settings: React.FC = () => {
                   Copy this and paste it into Meta App → WhatsApp → Configuration → Verify Token
                 </p>
               </div>
-            </div>
 
-            {/* Auto-populated after verify */}
+            </div>{/* end credentials grid */}
+
+            {/* ── Auto-populated fields after verify ── */}
             {(waConfig.display_phone_number || waConfig.verified_name) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/40 rounded-lg border border-border">
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Display Number</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                    Display Number
+                  </p>
                   <p className="text-sm font-medium text-foreground">
                     {waConfig.display_phone_number || '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Verified Name</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                    Verified Name
+                  </p>
                   <p className="text-sm font-medium text-foreground">
                     {waConfig.verified_name || '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Quality Rating</p>
-                  <p className={cn(
-                    'text-sm font-medium',
-                    waConfig.quality_rating === 'GREEN' ? 'text-green-600' :
-                    waConfig.quality_rating === 'YELLOW' ? 'text-yellow-600' :
-                    waConfig.quality_rating === 'RED' ? 'text-red-600' : 'text-foreground'
-                  )}>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                    Quality Rating
+                  </p>
+                  <p
+                    className={cn(
+                      'text-sm font-medium',
+                      waConfig.quality_rating === 'GREEN'
+                        ? 'text-green-600'
+                        : waConfig.quality_rating === 'YELLOW'
+                        ? 'text-yellow-600'
+                        : waConfig.quality_rating === 'RED'
+                        ? 'text-red-600'
+                        : 'text-foreground'
+                    )}
+                  >
                     {waConfig.quality_rating || '—'}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Active toggle */}
+            {/* ── Active toggle ── */}
             <div className="flex items-center justify-between py-3 border-t border-border">
               <div>
                 <p className="font-medium text-foreground">Enable WhatsApp Messaging</p>
@@ -939,21 +1105,27 @@ const Settings: React.FC = () => {
               </div>
               <Switch
                 checked={waConfig.is_active}
-                onCheckedChange={checked => setWaConfig(prev => ({ ...prev, is_active: checked }))}
+                onCheckedChange={checked =>
+                  setWaConfig(prev => ({ ...prev, is_active: checked }))
+                }
               />
             </div>
 
-            {/* Action buttons */}
+            {/* ── Action buttons ── */}
             <div className="flex flex-col sm:flex-row justify-between gap-3 pt-2">
               <Button
                 variant="outline"
                 onClick={handleVerify}
-                disabled={isVerifying || !waConfig.phone_number_id || !waConfig.access_token}
+                disabled={
+                  isVerifying || !waConfig.phone_number_id || !waConfig.access_token
+                }
                 className="gap-2"
               >
-                {isVerifying
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Zap className="w-4 h-4" />}
+                {isVerifying ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Zap className="w-4 h-4" />
+                )}
                 {isVerifying ? 'Verifying…' : 'Verify Connection'}
               </Button>
 
@@ -962,20 +1134,26 @@ const Settings: React.FC = () => {
                 disabled={isSavingWa}
                 className="bg-tenant-accent hover:bg-tenant-accent/90 text-tenant-accent-foreground gap-2"
               >
+                {isSavingWa ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
                 {isSavingWa
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Save className="w-4 h-4" />}
-                {isSavingWa ? 'Saving…' : waExists ? 'Update Configuration' : 'Save Configuration'}
+                  ? 'Saving…'
+                  : waExists
+                  ? 'Update Configuration'
+                  : 'Save Configuration'}
               </Button>
             </div>
-          </motion.div>
 
-        </TabsContent>
+          </motion.div>{/* end credentials card */}
+
+        </TabsContent>{/* end WhatsApp API tab */}
+
       </Tabs>
     </motion.div>
   );
 };
 
 export default Settings;
-
-      
