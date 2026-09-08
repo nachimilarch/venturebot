@@ -73,6 +73,7 @@ async function runCampaign(campaign) {
 
   for (const rawPhone of phones) {
     const phone = formatPhone(String(rawPhone));
+    if (!phone) { failed++; continue; }
     if (optedOutSet.has(phone)) { failed++; continue; }
 
     try {

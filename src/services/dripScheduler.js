@@ -48,6 +48,8 @@ async function processDueEnrollments() {
         continue;
       }
 
+      if (!enrollment.contact_phone) continue;
+
       const result = await whatsappTemplateService.sendTemplateMessage(
         enrollment.contact_phone, step.template_name, step.language, [], waConfig
       );
