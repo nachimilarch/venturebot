@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/database.js';
 
 class Campaign {
   static async create({ name, template_name, template_language }) {
@@ -20,4 +20,4 @@ class Campaign {
   }
 }
 
-module.exports = Campaign;
+export default Campaign;

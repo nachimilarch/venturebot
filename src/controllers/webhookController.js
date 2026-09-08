@@ -1,5 +1,5 @@
-const MessageLog = require('../models/MessageLog');
-const { log } = require('../utils/logger');
+import MessageLog from '../models/MessageLog.js';
+import { log } from '../utils/logger.js';
 
 async function verifyWebhook(req, res) {
   const verifyToken = process.env.WEBHOOK_VERIFY_TOKEN;
@@ -56,7 +56,4 @@ async function handleWebhook(req, res) {
   }
 }
 
-module.exports = {
-  verifyWebhook,
-  handleWebhook
-};
+export { verifyWebhook, handleWebhook };

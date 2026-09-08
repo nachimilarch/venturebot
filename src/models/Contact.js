@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/database.js';
 
 class Contact {
   static async bulkInsert(contacts) {
@@ -21,4 +21,4 @@ class Contact {
   }
 }
 
-module.exports = Contact;
+export default Contact;

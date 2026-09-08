@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/database.js';
 
 class MessageLog {
   static async createQueued({ campaign_id, contact_id, phone, template_name }) {
@@ -39,4 +39,4 @@ class MessageLog {
   }
 }
 
-module.exports = MessageLog;
+export default MessageLog;

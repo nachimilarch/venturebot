@@ -54,7 +54,7 @@ router.post('/purchase', async (req, res) => {
       
       // Update tenant credits
       await connection.execute(
-        'UPDATE tenants SET credits = credits + ? WHERE id = ?',
+        'UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?',
         [credits, req.user.tenantId]
       );
       

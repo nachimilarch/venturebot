@@ -1,4 +1,6 @@
-/* Simple console logger (replace with Winston in real prod if needed) */
-const log = (...args) => console.log(new Date().toISOString(), '-', ...args);
+// src/utils/logger.js
+function log(...args) {
+  console.log('[backend]', ...args);
+}
 
-module.exports = { log };
+export { log };

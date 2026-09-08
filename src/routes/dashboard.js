@@ -1,15 +1,20 @@
-import { Router } from "express";
-import pool from "../config/database.js";
-import { requireAuth } from "../middleware/auth.js";
+import { Router } from 'express';
+import * as db from '../config/database.js';
+const pool = db.default || db;
+
+import * as authPkg from '../middleware/auth.js';
+
+const { requireAuth } = authPkg;
 
 const router = Router();
 
-router.get("/stats", requireAuth, async (req, res) => {
+// GET /api/dashboard/stats
+router.get('/stats', requireAuth, async (req, res) => {
   const tenantId = req.user.tenantId;
 
   try {
     const [[tenantRow]] = await pool.query(
-      `SELECT credits, total_messages_sent
+      `SELECT credits_balance AS credits, total_messages_sent
        FROM tenants
        WHERE id = ?`,
       [tenantId]
@@ -54,24 +59,27 @@ router.get("/stats", requireAuth, async (req, res) => {
     const conversionRate = total > 0 ? Number(((converted / total) * 100).toFixed(1)) : 0;
 
     return res.json({
-      credits: Number(tenantRow?.credits || 0),
-      messagesSent: Number(tenantRow?.total_messages_sent || 0),
-      newLeads: Number(newLeadsRow?.count || 0),
-      upcomingAppointments: Number(upcomingRow?.count || 0),
-      activeCampaigns: Number(activeCampaignsRow?.count || 0),
-      conversionRate,
+      success: true,
+      data: {
+        credits: Number(tenantRow?.credits || 0),
+        messagesSent: Number(tenantRow?.total_messages_sent || 0),
+        newLeads: Number(newLeadsRow?.count || 0),
+        upcomingAppointments: Number(upcomingRow?.count || 0),
+        activeCampaigns: Number(activeCampaignsRow?.count || 0),
+        conversionRate
+      }
     });
   } catch (err) {
-    console.error("GET /dashboard/stats error:", err);
-    return res.status(500).json({ message: "Failed to load dashboard stats" });
+    console.error('GET /dashboard/stats error:', err);
+    return res.status(500).json({ message: 'Failed to load dashboard stats' });
   }
 });
 
-router.get("/charts", requireAuth, async (req, res) => {
+// GET /api/dashboard/charts
+router.get('/charts', requireAuth, async (req, res) => {
   const tenantId = req.user.tenantId;
 
   try {
-    // Leads trend last 7 days
     const [trendRows] = await pool.query(
       `SELECT
          DATE(created_at) AS day,
@@ -94,11 +102,10 @@ router.get("/charts", requireAuth, async (req, res) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
       const key = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString("en-US", { weekday: "short" });
+      const label = d.toLocaleDateString('en-US', { weekday: 'short' });
       return { name: label, value: dayMap[key] ?? 0, value2: 0 };
     });
 
-    // Leads by status
     const [statusRows] = await pool.query(
       `SELECT status, COUNT(*) AS count
        FROM leads
@@ -109,10 +116,9 @@ router.get("/charts", requireAuth, async (req, res) => {
 
     const leadsByStatus = statusRows.map((r) => ({
       name: String(r.status),
-      value: Number(r.count || 0),
+      value: Number(r.count || 0)
     }));
 
-    // Monthly performance: messagesSent from campaigns + leads created
     const [leadsMonthlyRows] = await pool.query(
       `SELECT
          DATE_FORMAT(created_at, '%Y-%m') AS monthKey,
@@ -146,13 +152,20 @@ router.get("/charts", requireAuth, async (req, res) => {
     const monthlyPerformance = leadsMonthlyRows.map((r) => ({
       name: String(r.monthLabel),
       value: msgMap[String(r.monthKey)] ?? 0,
-      value2: Number(r.leadsCreated || 0),
+      value2: Number(r.leadsCreated || 0)
     }));
 
-    return res.json({ leadsTrend, leadsByStatus, monthlyPerformance });
+    return res.json({
+      success: true,
+      data: {
+        leadsTrend,
+        leadsByStatus,
+        monthlyPerformance
+      }
+    });
   } catch (err) {
-    console.error("GET /dashboard/charts error:", err);
-    return res.status(500).json({ message: "Failed to load dashboard charts" });
+    console.error('GET /dashboard/charts error:', err);
+    return res.status(500).json({ message: 'Failed to load dashboard charts' });
   }
 });
 

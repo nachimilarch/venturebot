@@ -1,4 +1,4 @@
-const Papa = require('papaparse');
+import Papa from 'papaparse';
 
 function parseCsvBuffer(buffer) {
   return new Promise((resolve, reject) => {
@@ -25,4 +25,4 @@ function parseCsvBuffer(buffer) {
   });
 }
 
-module.exports = { parseCsvBuffer };
+export { parseCsvBuffer };

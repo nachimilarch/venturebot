@@ -1,4 +1,4 @@
-const db = require('../config/db');
+import db from '../config/database.js';
 
 class User {
   static async findByEmail(email) {
@@ -21,4 +21,4 @@ class User {
   }
 }
 
-module.exports = User;
+export default User;

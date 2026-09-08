@@ -1,0 +1,6 @@
+node_modules/
+.env
+.env.*
+.env.save
+.DS_Store
+*.pem

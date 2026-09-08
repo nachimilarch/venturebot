@@ -1,6 +1,6 @@
-const axios = require('axios');
-const { baseUrl, phoneNumberId, accessToken } = require('../config/whatsapp');
-const { log } = require('../utils/logger');
+import axios from 'axios';
+import { baseUrl, phoneNumberId, accessToken } from '../config/whatsapp.js';
+import { log } from '../utils/logger.js';
 
 /**
  * Send a WhatsApp template message with dynamic variables.
@@ -58,4 +58,4 @@ async function sendTemplateMessage({ to, template_name, template_language, templ
   }
 }
 
-module.exports = { sendTemplateMessage };
+export { sendTemplateMessage };

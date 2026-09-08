@@ -1,7 +1,10 @@
-const { log } = require('../utils/logger');
+// src/middleware/errorHandler.js
+import { log } from '../utils/logger.js';
 
 function errorHandler(err, req, res, next) {
+  const log = log.log || console.log;
   log('Error:', err.message, err.stack);
+
   const status = err.status || 500;
   res.status(status).json({
     success: false,
@@ -9,4 +12,4 @@ function errorHandler(err, req, res, next) {
   });
 }
 
-module.exports = errorHandler;
+export default errorHandler;

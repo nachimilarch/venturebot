@@ -1,6 +1,6 @@
-const { sendTemplateMessage } = require('./whatsappService');
-const MessageLog = require('../models/MessageLog');
-const { log } = require('../utils/logger');
+import { sendTemplateMessage } from './whatsappService.js';
+import MessageLog from '../models/MessageLog.js';
+import { log } from '../utils/logger.js';
 
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
 const BATCH_INTERVAL_MS = parseInt(process.env.BATCH_INTERVAL_MS || '60000', 10);
@@ -56,4 +56,4 @@ setInterval(() => {
   processBatch().catch(err => log('Batch processor error', err.message));
 }, BATCH_INTERVAL_MS);
 
-module.exports = { enqueue };
+export { enqueue };

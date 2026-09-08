@@ -1,6 +1,6 @@
-const multer = require('multer');
-const Contact = require('../models/Contact');
-const { parseCsvBuffer } = require('../services/csvService');
+import multer from 'multer';
+import Contact from '../models/Contact.js';
+import { parseCsvBuffer } from '../services/csvService.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -41,8 +41,4 @@ async function listContacts(req, res, next) {
   }
 }
 
-module.exports = {
-  upload,
-  uploadContacts,
-  listContacts
-};
+export { upload, uploadContacts, listContacts };

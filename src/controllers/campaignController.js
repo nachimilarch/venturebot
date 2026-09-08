@@ -1,7 +1,7 @@
-const db = require('../config/db');
-const Campaign = require('../models/Campaign');
-const MessageLog = require('../models/MessageLog');
-const { enqueue } = require('../services/messageQueue');
+import db from '../config/database.js';
+import Campaign from '../models/Campaign.js';
+import MessageLog from '../models/MessageLog.js';
+import { enqueue } from '../services/messageQueue.js';
 
 /**
  * POST /api/campaigns
@@ -85,4 +85,4 @@ async function createCampaign(req, res, next) {
   }
 }
 
-module.exports = { createCampaign };
+export { createCampaign };

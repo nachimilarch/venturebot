@@ -1,9 +1,13 @@
+// src/routes/leads.js
 import express from 'express';
-import pool from '../config/database.js';
-import { authMiddleware } from '../middleware/auth.js';
+import * as db from '../config/database.js';
+const pool = db.default || db;
+
+import * as authPkg from '../middleware/auth.js';
+
+const { authMiddleware } = authPkg;
 
 const router = express.Router();
-
 router.use(authMiddleware);
 
 // Get all leads for tenant
@@ -13,7 +17,7 @@ router.get('/', async (req, res) => {
       'SELECT * FROM leads WHERE tenant_id = ? ORDER BY created_at DESC',
       [req.user.tenantId]
     );
-    res.json(leads);
+    res.json({ success: true, data: leads });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -26,12 +30,12 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM leads WHERE id = ? AND tenant_id = ?',
       [req.params.id, req.user.tenantId]
     );
-    
+
     if (leads.length === 0) {
       return res.status(404).json({ error: 'Lead not found' });
     }
-    
-    res.json(leads[0]);
+
+    res.json({ success: true, data: leads[0] });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -41,34 +45,63 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name, email, phone, status, source, property, budget, notes, assignedTo } = req.body;
-    
+
+    // Validate required fields
+    if (!name || !phone) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Name and phone are required' 
+      });
+    }
+
     const [result] = await pool.execute(
-      `INSERT INTO leads 
-       (tenant_id, name, email, phone, status, source, property, budget, notes, assigned_to) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.tenantId, name, email, phone, status || 'new', source, property, budget, notes, assignedTo]
+      `INSERT INTO leads
+       (tenant_id, name, email, phone, status, source, property, budget, notes, assigned_to, score)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.tenantId, 
+        name, 
+        email || null, 
+        phone, 
+        status || 'new', 
+        source || null, 
+        property || null, 
+        budget || null, 
+        notes || null, 
+        assignedTo || null,
+        0
+      ]
     );
-    
-    res.status(201).json({ id: result.insertId, message: 'Lead created successfully' });
+
+    res.status(201).json({
+      success: true,
+      id: result.insertId,
+      message: 'Lead created successfully'
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Create lead error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message 
+    });
   }
 });
+
 
 // Update lead
 router.put('/:id', async (req, res) => {
   try {
     const { name, email, phone, status, source, property, budget, notes, assignedTo, score } = req.body;
-    
+
     await pool.execute(
-      `UPDATE leads SET 
-       name = ?, email = ?, phone = ?, status = ?, source = ?, 
-       property = ?, budget = ?, notes = ?, assigned_to = ?, score = ?
+      `UPDATE leads SET
+         name = ?, email = ?, phone = ?, status = ?, source = ?,
+         property = ?, budget = ?, notes = ?, assigned_to = ?, score = ?
        WHERE id = ? AND tenant_id = ?`,
       [name, email, phone, status, source, property, budget, notes, assignedTo, score, req.params.id, req.user.tenantId]
     );
-    
-    res.json({ message: 'Lead updated successfully' });
+
+    res.json({ success: true, message: 'Lead updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -81,7 +114,8 @@ router.delete('/:id', async (req, res) => {
       'DELETE FROM leads WHERE id = ? AND tenant_id = ?',
       [req.params.id, req.user.tenantId]
     );
-    res.json({ message: 'Lead deleted successfully' });
+
+    res.json({ success: true, message: 'Lead deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
