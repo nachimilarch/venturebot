@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  MessageSquare, Mail, Lock, Building2,
+  Users, Mail, Lock, Building2,
   ArrowRight, Eye, EyeOff, CheckCircle2, User,
+  GitBranch, Filter, BarChart3,
 } from 'lucide-react';
 import { useAuth }    from '@/contexts/AuthContext';
 import { Button }     from '@/components/ui/button';
@@ -13,25 +14,22 @@ import { Label }      from '@/components/ui/label';
 import { useToast }   from '@/hooks/use-toast';
 import { cn }         from '@/lib/utils';
 
-
 // ─── Static content ───────────────────────────────────────────────────────────
 
 const BRAND = {
   name:    'VaartaBot',
-  tagline: 'WhatsApp Automation Platform',
-  hero:    'Start automating in minutes.',
-  sub:     'Create your account and connect your WhatsApp number. Your first campaign can go live today.',
+  tagline: 'Lead Management Platform',
+  hero:    'Start managing leads smarter.',
+  sub:     'Create your workspace and connect your lead sources. Your pipeline can be live in minutes.',
   trust:   'No credit card required to get started',
 };
 
 const PERKS = [
-  'Bulk WhatsApp campaigns with one click',
-  'Auto-reply flows & chatbot builder',
-  'Lead CRM + appointment scheduling',
-  'Real-time delivery & read analytics',
-  'Multi-agent team support',
+  'Centralised lead inbox from all sources',
+  'Drag-and-drop pipeline management',
+  'Automated follow-up reminders',
+  'Real-time analytics & conversion reports',
 ];
-
 
 // ─── Password strength ────────────────────────────────────────────────────────
 
@@ -51,7 +49,6 @@ function getPasswordStrength(pw: string) {
   ];
   return { score, ...map[score] };
 }
-
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -102,7 +99,7 @@ const Register: React.FC = () => {
       if (success) {
         toast({
           title:       'Account created!',
-          description: 'Welcome to VaartaBot. Let\'s set up your workspace.',
+          description: 'Welcome to VaartaBot. Let us set up your workspace.',
         });
         navigate('/dashboard');
       } else {
@@ -113,7 +110,6 @@ const Register: React.FC = () => {
         });
       }
     } catch (err: any) {
-      // Show server-side error message if available
       const serverMsg = err?.response?.data?.error;
       toast({
         title:       'Registration failed',
@@ -147,7 +143,7 @@ const Register: React.FC = () => {
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-tenant-accent flex items-center justify-center shadow-lg">
-            <MessageSquare className="w-6 h-6 text-white" />
+            <Users className="w-6 h-6 text-white" />
           </div>
           <div>
             <p className="text-xl font-bold text-sidebar-foreground tracking-tight">{BRAND.name}</p>
@@ -178,6 +174,26 @@ const Register: React.FC = () => {
               </div>
             ))}
           </motion.div>
+
+          {/* Mini feature icons */}
+          <motion.div
+            className="flex gap-4 pt-2"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            transition={{ delay: 0.55, duration: 0.5 }}
+          >
+            {[
+              { icon: Filter,    label: 'Segment'  },
+              { icon: GitBranch, label: 'Integrate' },
+              { icon: BarChart3, label: 'Analyse'  },
+            ].map(({ icon: Icon, label }) => (
+              <div key={label} className="flex flex-col items-center gap-1.5">
+                <div className="w-10 h-10 rounded-xl bg-sidebar-accent/60 border border-sidebar-border flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-tenant-accent" />
+                </div>
+                <span className="text-[11px] text-sidebar-muted">{label}</span>
+              </div>
+            ))}
+          </motion.div>
         </div>
 
         <div className="relative z-10 space-y-2">
@@ -201,7 +217,7 @@ const Register: React.FC = () => {
           {/* Mobile logo */}
           <div className="flex items-center gap-3 lg:hidden">
             <div className="w-10 h-10 rounded-xl bg-tenant-accent flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
+              <Users className="w-5 h-5 text-white" />
             </div>
             <p className="text-lg font-bold text-foreground">{BRAND.name}</p>
           </div>
@@ -263,7 +279,7 @@ const Register: React.FC = () => {
                   autoComplete="organization"
                   value={businessName}
                   onChange={e => setBusinessName(e.target.value)}
-                  placeholder="Acme Corp, City Clinic…"
+                  placeholder="Acme Corp, City Clinic..."
                   className="pl-10 h-12"
                   disabled={isLoading}
                   required
@@ -359,7 +375,7 @@ const Register: React.FC = () => {
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Creating account…
+                  Creating account...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">

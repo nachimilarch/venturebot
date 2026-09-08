@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vaartabot CRM API — Integration Reference</title>
+<meta name="description" content="Complete API reference for integrating your CRM with Vaartabot WhatsApp messaging.">
+<style>
+:root {
+  --bg:          #F6F8FA;
+  --bg-sidebar:  #FFFFFF;
+  --bg-code:     #F0F4F8;
+  --bg-panel:    #FFFFFF;
+  --border:      #D0D7DE;
+  --text:        #1C2128;
+  --text-muted:  #57606A;
+  --text-code:   #1A1F2E;
+  --accent:      #1A7F37;
+  --accent-glow: rgba(26,127,55,.12);
+  --link:        #1A7F37;
+  --method-get:  #0550AE;
+  --method-get-bg: #DDF4FF;
+  --method-post: #1A7F37;
+  --method-post-bg: #DAFBE1;
+  --method-del:  #B91C1C;
+  --method-del-bg: #FFEBE9;
+  --method-patch: #7D4E00;
+  --method-patch-bg: #FFF8C5;
+  --sidebar-w: 264px;
+  --radius: 6px;
+  --mono: ui-monospace, 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0D1117; --bg-sidebar: #161B22; --bg-code: #161B22; --bg-panel: #1C2128;
+    --border: #30363D; --text: #E6EDF3; --text-muted: #8B949E; --text-code: #E6EDF3;
+    --accent: #3FB950; --accent-glow: rgba(63,185,80,.14); --link: #3FB950;
+    --method-get: #58A6FF; --method-get-bg: #0C2D6B;
+    --method-post: #3FB950; --method-post-bg: #0F2A14;
+    --method-del: #F85149; --method-del-bg: #3B1219;
+    --method-patch: #D29922; --method-patch-bg: #2D1E00;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #F6F8FA; --bg-sidebar: #FFFFFF; --bg-code: #F0F4F8; --bg-panel: #FFFFFF;
+  --border: #D0D7DE; --text: #1C2128; --text-muted: #57606A; --text-code: #1A1F2E;
+  --accent: #1A7F37; --accent-glow: rgba(26,127,55,.12); --link: #1A7F37;
+  --method-get: #0550AE; --method-get-bg: #DDF4FF;
+  --method-post: #1A7F37; --method-post-bg: #DAFBE1;
+  --method-del: #B91C1C; --method-del-bg: #FFEBE9;
+  --method-patch: #7D4E00; --method-patch-bg: #FFF8C5;
+}
+:root[data-theme="dark"] {
+  --bg: #0D1117; --bg-sidebar: #161B22; --bg-code: #161B22; --bg-panel: #1C2128;
+  --border: #30363D; --text: #E6EDF3; --text-muted: #8B949E; --text-code: #E6EDF3;
+  --accent: #3FB950; --accent-glow: rgba(63,185,80,.14); --link: #3FB950;
+  --method-get: #58A6FF; --method-get-bg: #0C2D6B;
+  --method-post: #3FB950; --method-post-bg: #0F2A14;
+  --method-del: #F85149; --method-del-bg: #3B1219;
+  --method-patch: #D29922; --method-patch-bg: #2D1E00;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+  display: flex;
+  min-height: 100vh;
+}
+
+#sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: thin;
+}
+.sidebar-header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+.logo-mark {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark svg { width: 18px; height: 18px; fill: #fff; }
+.logo-text { font-weight: 700; font-size: .875rem; color: var(--text); letter-spacing: -.01em; line-height: 1.2; }
+.logo-text span { display: block; font-size: .7rem; font-weight: 500; color: var(--text-muted); letter-spacing: .04em; text-transform: uppercase; }
+.sidebar-version {
+  margin-top: 8px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .7rem; color: var(--accent); font-weight: 600; letter-spacing: .03em;
+}
+.sidebar-version::before { content: ''; display: inline-block; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+.back-link {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; font-size: .75rem;
+  color: var(--text-muted); text-decoration: none; transition: color .1s;
+}
+.back-link:hover { color: var(--accent); }
+.back-link svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+nav { padding: 12px 0 24px; flex: 1; }
+.nav-group { padding: 0 12px; margin-top: 4px; }
+.nav-label { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); padding: 8px 8px 4px; display: block; }
+.nav-link {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 8px; border-radius: 5px; text-decoration: none;
+  font-size: .825rem; color: var(--text-muted);
+  transition: background .1s, color .1s; gap: 6px;
+}
+.nav-link:hover { background: var(--accent-glow); color: var(--text); }
+.nav-link.active { background: var(--accent-glow); color: var(--accent); font-weight: 600; }
+.nav-badge {
+  font-size: .62rem; font-weight: 700; font-family: var(--mono);
+  padding: 1px 5px; border-radius: 3px; letter-spacing: .02em; flex-shrink: 0;
+}
+.nb-get   { color: var(--method-get);   background: var(--method-get-bg); }
+.nb-post  { color: var(--method-post);  background: var(--method-post-bg); }
+.nb-del   { color: var(--method-del);   background: var(--method-del-bg); }
+.nb-patch { color: var(--method-patch); background: var(--method-patch-bg); }
+
+.theme-toggle {
+  margin: auto 12px 16px; padding: 8px 10px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+  font-size: .775rem; font-family: var(--sans); cursor: pointer;
+  display: flex; align-items: center; gap: 6px; transition: border-color .15s, color .15s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+
+#content { flex: 1; min-width: 0; max-width: 860px; padding: 48px 56px; }
+@media (max-width: 900px) { #content { padding: 32px 24px; } }
+
+.page-hero { margin-bottom: 48px; }
+.hero-eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; color: var(--text); line-height: 1.15; text-wrap: balance; margin-bottom: 14px; }
+.hero-desc { font-size: 1rem; color: var(--text-muted); max-width: 58ch; line-height: 1.7; }
+.hero-meta { margin-top: 20px; display: flex; gap: 20px; flex-wrap: wrap; font-size: .8rem; color: var(--text-muted); }
+.hero-meta span { display: flex; align-items: center; gap: 5px; }
+.hero-meta strong { color: var(--text); }
+.base-url-box {
+  margin-top: 20px; background: var(--bg-code); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: .825rem; overflow-x: auto;
+}
+.base-url-box .label { font-family: var(--sans); font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); flex-shrink: 0; }
+.base-url-box .url { color: var(--accent); font-weight: 600; }
+
+.section { margin-bottom: 56px; scroll-margin-top: 24px; }
+h2 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); text-wrap: balance; }
+h3 { font-size: .95rem; font-weight: 700; color: var(--text); margin: 28px 0 10px; }
+p { color: var(--text-muted); margin-bottom: 14px; max-width: 66ch; }
+a { color: var(--link); text-decoration: underline; text-underline-offset: 3px; }
+code { font-family: var(--mono); font-size: .85em; background: var(--bg-code); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; }
+
+.endpoint { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 28px; overflow: hidden; }
+.endpoint-header { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+.endpoint-header:hover { background: var(--accent-glow); }
+.method-badge { font-family: var(--mono); font-size: .72rem; font-weight: 800; letter-spacing: .04em; padding: 3px 7px; border-radius: 4px; min-width: 52px; text-align: center; flex-shrink: 0; }
+.m-get   { color: var(--method-get);   background: var(--method-get-bg); }
+.m-post  { color: var(--method-post);  background: var(--method-post-bg); }
+.m-del   { color: var(--method-del);   background: var(--method-del-bg); }
+.m-patch { color: var(--method-patch); background: var(--method-patch-bg); }
+.endpoint-path { font-family: var(--mono); font-size: .85rem; color: var(--text); font-weight: 500; flex: 1; }
+.endpoint-summary { font-size: .78rem; color: var(--text-muted); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.endpoint-body { padding: 20px; display: none; }
+.endpoint.open .endpoint-body { display: block; }
+.endpoint-desc { font-size: .85rem; color: var(--text-muted); margin-bottom: 16px; max-width: 58ch; }
+
+.code-block { background: var(--bg-code); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+.code-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--bg-sidebar); }
+.code-lang { font-size: .68rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); }
+.copy-btn { font-size: .7rem; font-family: var(--sans); background: transparent; border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; color: var(--text-muted); cursor: pointer; transition: color .1s, border-color .1s; }
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: .8rem; line-height: 1.7; color: var(--text-code); }
+
+.tk-key  { color: #58A6FF; }
+.tk-str  { color: #A5D6FF; }
+.tk-num  { color: #79C0FF; }
+.tk-bool { color: #FF7B72; }
+.tk-null { color: #FF7B72; }
+.tk-cm   { color: #8B949E; font-style: italic; }
+@media (prefers-color-scheme: light) {
+  .tk-key { color: #0550AE; } .tk-str { color: #1A7F37; } .tk-num { color: #8250DF; }
+  .tk-bool{ color: #CF222E; } .tk-null{ color: #CF222E; } .tk-cm  { color: #57606A; }
+}
+:root[data-theme="light"] .tk-key { color: #0550AE; } :root[data-theme="light"] .tk-str { color: #1A7F37; }
+:root[data-theme="light"] .tk-num { color: #8250DF; } :root[data-theme="light"] .tk-bool{ color: #CF222E; }
+:root[data-theme="light"] .tk-null{ color: #CF222E; } :root[data-theme="light"] .tk-cm  { color: #57606A; }
+:root[data-theme="dark"]  .tk-key { color: #58A6FF; } :root[data-theme="dark"]  .tk-str { color: #A5D6FF; }
+:root[data-theme="dark"]  .tk-num { color: #79C0FF; } :root[data-theme="dark"]  .tk-bool{ color: #FF7B72; }
+:root[data-theme="dark"]  .tk-null{ color: #FF7B72; } :root[data-theme="dark"]  .tk-cm  { color: #8B949E; }
+
+.params-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.params-table th { text-align: left; font-size: .67rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.params-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text-muted); vertical-align: top; }
+.params-table tr:last-child td { border-bottom: none; }
+.params-table td:first-child { font-family: var(--mono); font-size: .78rem; color: var(--text); white-space: nowrap; }
+.type-pill { font-size: .65rem; font-family: var(--mono); background: var(--bg-code); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; color: var(--text-muted); margin-right: 4px; }
+.req-badge { font-size: .62rem; font-weight: 700; background: var(--method-post-bg); color: var(--method-post); border-radius: 3px; padding: 1px 5px; }
+
+.info-box { display: flex; gap: 10px; background: var(--accent-glow); border: 1px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; font-size: .83rem; color: var(--text); }
+.info-box .icon { flex-shrink: 0; font-size: 1rem; line-height: 1.5; }
+.warn-box { display: flex; gap: 10px; background: color-mix(in srgb, #D4A72C 10%, transparent); border: 1px solid #D4A72C; border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px; font-size: .83rem; color: var(--text); }
+
+.error-row td:first-child { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+.e-4xx { color: #D29922; } .e-401 { color: #F85149; } .e-500 { color: #8250DF; }
+:root[data-theme="light"] .e-401 { color: #CF222E; }
+:root[data-theme="light"] .e-4xx { color: #7D4E00; }
+
+.packages-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.pkg-card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; font-size: .82rem; }
+.pkg-card .pkg-name { font-weight: 700; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+.pkg-card .pkg-credits { font-size: 1.25rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.pkg-card .pkg-credits span { font-size: .8rem; font-weight: 500; color: var(--text-muted); }
+.pkg-card .pkg-price { font-size: .85rem; font-weight: 600; color: var(--accent); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pkg-card .pkg-id { font-family: var(--mono); font-size: .68rem; color: var(--text-muted); margin-top: 8px; }
+
+.events-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.event-chip { font-family: var(--mono); font-size: .72rem; background: var(--method-get-bg); color: var(--method-get); border: 1px solid; border-color: color-mix(in srgb, var(--method-get) 30%, transparent); border-radius: 4px; padding: 2px 8px; }
+
+hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+.chevron { margin-left: auto; color: var(--text-muted); font-size: .7rem; transition: transform .2s; flex-shrink: 0; }
+.endpoint.open .chevron { transform: rotate(90deg); }
+
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-track { background: transparent; }
+#sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+@media (max-width: 700px) {
+  body { flex-direction: column; }
+  #sidebar { width: 100%; height: auto; position: relative; }
+  #content { padding: 24px 16px; }
+  .endpoint-summary { display: none; }
+  .packages-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <a href="https://vaartabot.com" class="sidebar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.112.55 4.094 1.512 5.815L.057 23.086a.75.75 0 0 0 .857.857l5.271-1.455A11.943 11.943 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75A9.75 9.75 0 1 1 12 2.25a9.75 9.75 0 0 1 0 19.5z"/></svg>
+      </div>
+      <div class="logo-text">Vaartabot<span>CRM API Reference</span></div>
+    </a>
+    <div class="sidebar-version">v1 · Live</div>
+    <a href="https://vaartabot.com/dashboard" class="back-link">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06z"/></svg>
+      Back to Dashboard
+    </a>
+  </div>
+
+  <nav>
+    <div class="nav-group">
+      <span class="nav-label">Getting Started</span>
+      <a href="#overview" class="nav-link active">Overview</a>
+      <a href="#authentication" class="nav-link">Authentication</a>
+      <a href="#errors" class="nav-link">Errors &amp; Codes</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Credits</span>
+      <a href="#credits-balance" class="nav-link">Check Balance <span class="nav-badge nb-get">GET</span></a>
+      <a href="#credits-packages" class="nav-link">Credit Packages <span class="nav-badge nb-get">GET</span></a>
+      <a href="#credits-transactions" class="nav-link">Transactions <span class="nav-badge nb-get">GET</span></a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Messaging</span>
+      <a href="#messages-send" class="nav-link">Send Message <span class="nav-badge nb-post">POST</span></a>
+      <a href="#messages-reply" class="nav-link">Reply (Free Text) <span class="nav-badge nb-post">POST</span></a>
+      <a href="#messages-bulk" class="nav-link">Bulk Send <span class="nav-badge nb-post">POST</span></a>
+      <a href="#messages-status" class="nav-link">Delivery Status <span class="nav-badge nb-get">GET</span></a>
+      <a href="#messages-logs" class="nav-link">Message Logs <span class="nav-badge nb-get">GET</span></a>
+      <a href="#messages-inbox" class="nav-link">Inbox (Replies) <span class="nav-badge nb-get">GET</span></a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Templates</span>
+      <a href="#templates-list" class="nav-link">List Templates <span class="nav-badge nb-get">GET</span></a>
+      <a href="#templates-sync" class="nav-link">Sync from Meta <span class="nav-badge nb-get">GET</span></a>
+      <a href="#templates-create" class="nav-link">Create Template <span class="nav-badge nb-post">POST</span></a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Webhooks</span>
+      <a href="#webhooks-list" class="nav-link">List Webhooks <span class="nav-badge nb-get">GET</span></a>
+      <a href="#webhooks-create" class="nav-link">Register Webhook <span class="nav-badge nb-post">POST</span></a>
+      <a href="#webhooks-test" class="nav-link">Test Ping <span class="nav-badge nb-post">POST</span></a>
+      <a href="#webhooks-update" class="nav-link">Update Webhook <span class="nav-badge nb-patch">PATCH</span></a>
+      <a href="#webhooks-delete" class="nav-link">Remove Webhook <span class="nav-badge nb-del">DEL</span></a>
+      <a href="#webhooks-payload" class="nav-link">Payload &amp; Signing</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Key Management</span>
+      <a href="#apikeys-list" class="nav-link">List Keys <span class="nav-badge nb-get">GET</span></a>
+      <a href="#apikeys-create" class="nav-link">Create Key <span class="nav-badge nb-post">POST</span></a>
+      <a href="#apikeys-revoke" class="nav-link">Revoke Key <span class="nav-badge nb-del">DEL</span></a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Resources</span>
+      <a href="#purchase-flow" class="nav-link">Credit Purchase Flow</a>
+      <a href="#rate-limits" class="nav-link">Rate Limits</a>
+    </div>
+  </nav>
+
+  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+    <span id="theme-icon">☀️</span> Toggle theme
+  </button>
+</aside>
+
+<main id="content">
+  <div class="page-hero" id="overview">
+    <div class="hero-eyebrow">Vaartabot · CRM Integration API</div>
+    <h1>Send WhatsApp promotions from your CRM</h1>
+    <p class="hero-desc">Use the Vaartabot API to send approved template messages, manage templates, receive real-time reply notifications, and track credits — all from your own CRM or marketing tool.</p>
+    <div class="hero-meta">
+      <span><strong>Protocol</strong> HTTPS / REST</span>
+      <span><strong>Format</strong> JSON</span>
+      <span><strong>Auth</strong> API Key</span>
+      <span><strong>Cost</strong> 1 credit per message</span>
+    </div>
+    <div class="base-url-box">
+      <span class="label">Base URL</span>
+      <span class="url">https://vaartabot.com/api/v1</span>
+    </div>
+  </div>
+
+  <section class="section" id="authentication">
+    <h2>Authentication</h2>
+    <p>All API v1 requests require an API key in the <code>X-API-Key</code> header. Generate keys from your Vaartabot dashboard → <strong>API Reference → API Keys</strong>.</p>
+    <div class="warn-box">
+      <span>⚠️</span>
+      <span>Keys are shown only once at creation. Store them immediately in your CRM's environment config. If a key is lost, revoke it and generate a new one.</span>
+    </div>
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">HTTP</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>GET /api/v1/credits/balance HTTP/1.1
+Host: vaartabot.com
+<span class="tk-key">X-API-Key:</span> <span class="tk-str">vb_a1b2c3d4e5f6...</span>
+<span class="tk-key">Content-Type:</span> <span class="tk-str">application/json</span></pre>
+    </div>
+    <h3>Key format</h3>
+    <p>All keys start with <code>vb_</code> followed by 40 hex characters. The 12-character prefix is shown in your dashboard for identification.</p>
+  </section>
+
+  <section class="section" id="errors">
+    <h2>Errors &amp; Status Codes</h2>
+    <p>Every response has a top-level <code>success</code> boolean. On failure, <code>error</code> has a human-readable message.</p>
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">JSON — error shape</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">false</span>,
+  <span class="tk-key">"error"</span>:   <span class="tk-str">"Insufficient credits. Purchase more at https://vaartabot.com/billing"</span>,
+  <span class="tk-key">"creditsBalance"</span>: <span class="tk-num">0</span>  <span class="tk-cm">// only on 402</span>
+}</pre>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="params-table">
+      <thead><tr><th>Status</th><th>Meaning</th><th>How to handle</th></tr></thead>
+      <tbody>
+        <tr class="error-row"><td class="e-4xx">400</td><td>Bad Request</td><td>Missing or invalid fields — check the <code>error</code> message</td></tr>
+        <tr class="error-row"><td class="e-401">401</td><td>Invalid or missing API key</td><td>Check <code>X-API-Key</code> header; regenerate if lost</td></tr>
+        <tr class="error-row"><td class="e-4xx">402</td><td>Insufficient credits</td><td>Direct user to <a href="https://vaartabot.com/billing">vaartabot.com/billing</a></td></tr>
+        <tr class="error-row"><td class="e-4xx">404</td><td>Resource not found</td><td>Check the ID or phone number in your request</td></tr>
+        <tr class="error-row"><td class="e-4xx">422</td><td>WhatsApp/Meta rejected the request</td><td>Verify template name, language, variable count, or template status</td></tr>
+        <tr class="error-row"><td class="e-4xx">429</td><td>Rate limit exceeded</td><td>Back off and retry after the <code>Retry-After</code> header value (seconds)</td></tr>
+        <tr class="error-row"><td class="e-500">502</td><td>Meta API error</td><td>Meta Graph API returned an error — retry or check Meta status page</td></tr>
+        <tr class="error-row"><td class="e-500">500</td><td>Server error</td><td>Retry with exponential back-off; contact support if persistent</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- ── CREDITS ─────────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2>Credits</h2>
+    <p>Each WhatsApp message costs exactly <strong>1 credit</strong>. Credits are purchased from the Vaartabot dashboard.</p>
+
+    <div class="endpoint open" id="credits-balance">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/credits/balance</span>
+        <span class="endpoint-summary">Current credit balance</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Returns the current credit balance and total messages sent for the account linked to your API key.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl https://vaartabot.com/api/v1/credits/balance \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"creditsBalance"</span>:    <span class="tk-num">1480</span>,
+    <span class="tk-key">"totalMessagesSent"</span>: <span class="tk-num">3520</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="credits-packages">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/credits/packages</span>
+        <span class="endpoint-summary">Available purchase packages</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Returns all available credit packages with pricing.</p>
+        <div class="packages-grid">
+          <div class="pkg-card"><div class="pkg-name">Starter</div><div class="pkg-credits">500 <span>credits</span></div><div class="pkg-price">₹499</div><div class="pkg-id">id: 1</div></div>
+          <div class="pkg-card"><div class="pkg-name">Basic</div><div class="pkg-credits">2,000 <span>credits</span></div><div class="pkg-price">₹1,599</div><div class="pkg-id">id: 2</div></div>
+          <div class="pkg-card"><div class="pkg-name">Growth</div><div class="pkg-credits">5,000 <span>credits</span></div><div class="pkg-price">₹3,499</div><div class="pkg-id">id: 3</div></div>
+          <div class="pkg-card"><div class="pkg-name">Pro</div><div class="pkg-credits">15,000 <span>credits</span></div><div class="pkg-price">₹8,999</div><div class="pkg-id">id: 4</div></div>
+          <div class="pkg-card"><div class="pkg-name">Enterprise</div><div class="pkg-credits">30,000 <span>credits</span></div><div class="pkg-price">₹15,999</div><div class="pkg-id">id: 5</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="credits-transactions">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/credits/transactions</span>
+        <span class="endpoint-summary">Transaction history</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Paginated credit transaction history — purchases and usage. Query params: <code>limit</code> (max 100, default 20) and <code>offset</code>.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl "https://vaartabot.com/api/v1/credits/transactions?limit=20&offset=0" \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: [
+    {
+      <span class="tk-key">"id"</span>: <span class="tk-num">142</span>, <span class="tk-key">"type"</span>: <span class="tk-str">"purchase"</span>,
+      <span class="tk-key">"amount"</span>: <span class="tk-num">1599</span>, <span class="tk-key">"credits"</span>: <span class="tk-num">2000</span>,
+      <span class="tk-key">"description"</span>: <span class="tk-str">"Basic — 2,000 credits"</span>,
+      <span class="tk-key">"status"</span>: <span class="tk-str">"completed"</span>,
+      <span class="tk-key">"created_at"</span>: <span class="tk-str">"2026-07-10T08:22:14.000Z"</span>
+    }
+  ],
+  <span class="tk-key">"limit"</span>: <span class="tk-num">20</span>, <span class="tk-key">"offset"</span>: <span class="tk-num">0</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MESSAGING ──────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2>Messaging</h2>
+    <p>Send approved WhatsApp template messages and read inbound replies. Each successful send costs <strong>1 credit</strong>.</p>
+    <div class="info-box">
+      <span class="icon">💡</span>
+      <span>Phone numbers are auto-normalised — <code>9876543210</code> (10-digit) becomes <code>919876543210</code> (E.164).</span>
+    </div>
+
+    <div class="endpoint open" id="messages-send">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/messages/send</span>
+        <span class="endpoint-summary">Send a single message — 1 credit</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Send a WhatsApp template message to one recipient. Deducts 1 credit on success.</p>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>to <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>Recipient phone (10-digit or E.164)</td></tr>
+            <tr><td>templateName <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>Exact name of the approved template</td></tr>
+            <tr><td>language</td><td><span class="type-pill">string</span></td><td>Language code, default <code>"en"</code></td></tr>
+            <tr><td>variables</td><td><span class="type-pill">string[]</span></td><td>Values for <code>{{1}}</code>, <code>{{2}}</code> … in order</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X POST https://vaartabot.com/api/v1/messages/send \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span> \
+  -H <span class="tk-str">"Content-Type: application/json"</span> \
+  -d <span class="tk-str">'{
+    "to": "9876543210",
+    "templateName": "summer_sale_promo",
+    "language": "en",
+    "variables": ["Priya", "30%", "July 31"]
+  }'</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"messageId"</span>:    <span class="tk-str">"wamid.HBgM..."</span>,
+    <span class="tk-key">"logId"</span>:        <span class="tk-num">2847</span>,
+    <span class="tk-key">"to"</span>:           <span class="tk-str">"919876543210"</span>,
+    <span class="tk-key">"templateName"</span>: <span class="tk-str">"summer_sale_promo"</span>,
+    <span class="tk-key">"creditsUsed"</span>:  <span class="tk-num">1</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="messages-reply">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/messages/reply</span>
+        <span class="endpoint-summary">Reply with free text — no credits</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Send a free-text reply to a user who messaged your business first. No template approval needed. No credit cost. WhatsApp enforces a <strong>24-hour window</strong> — calls made after the window expires return a <code>422</code> with a clear error.</p>
+        <div class="info-box">
+          <span class="icon">💡</span>
+          <span>Use <code>GET /messages/inbox</code> to find users who have recently messaged you, then reply within 24 hours using this endpoint.</span>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>to <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>Recipient phone (10-digit or E.164)</td></tr>
+            <tr><td>message <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>Free-form text (max 4096 characters)</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X POST https://vaartabot.com/api/v1/messages/reply \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span> \
+  -H <span class="tk-str">"Content-Type: application/json"</span> \
+  -d <span class="tk-str">'{
+    "to": "9876543210",
+    "message": "Hi Priya! Thanks for reaching out. Let me check availability and get back to you shortly."
+  }'</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"messageId"</span>: <span class="tk-str">"wamid.HBgM..."</span>,
+    <span class="tk-key">"logId"</span>:     <span class="tk-num">2849</span>,
+    <span class="tk-key">"to"</span>:        <span class="tk-str">"919876543210"</span>
+  }
+}</pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 422 — window expired</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">false</span>,
+  <span class="tk-key">"error"</span>: <span class="tk-str">"Recipient not on WhatsApp or has not messaged your business first."</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="messages-bulk">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/messages/bulk-send</span>
+        <span class="endpoint-summary">Bulk send — 1 credit each, max 500</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Send the same template to up to 500 recipients. Credits are only charged for messages that successfully send.</p>
+        <div class="warn-box">
+          <span>⚠️</span>
+          <span>The account must have at least as many credits as recipients before the call is accepted (checked upfront, no partial deductions).</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X POST https://vaartabot.com/api/v1/messages/bulk-send \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span> \
+  -H <span class="tk-str">"Content-Type: application/json"</span> \
+  -d <span class="tk-str">'{
+    "templateName": "summer_sale_promo",
+    "recipients": [
+      { "to": "9876543210", "variables": ["Priya", "30%"] },
+      { "to": "9123456789", "variables": ["Rahul", "25%"] }
+    ]
+  }'</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"sent"</span>: <span class="tk-num">2</span>, <span class="tk-key">"failed"</span>: <span class="tk-num">0</span>, <span class="tk-key">"total"</span>: <span class="tk-num">2</span>,
+    <span class="tk-key">"creditsUsed"</span>: <span class="tk-num">2</span>, <span class="tk-key">"creditsRemaining"</span>: <span class="tk-num">1478</span>,
+    <span class="tk-key">"results"</span>: [
+      { <span class="tk-key">"to"</span>: <span class="tk-str">"919876543210"</span>, <span class="tk-key">"status"</span>: <span class="tk-str">"sent"</span>, <span class="tk-key">"messageId"</span>: <span class="tk-str">"wamid.ABC..."</span> },
+      { <span class="tk-key">"to"</span>: <span class="tk-str">"919123456789"</span>, <span class="tk-key">"status"</span>: <span class="tk-str">"sent"</span>, <span class="tk-key">"messageId"</span>: <span class="tk-str">"wamid.DEF..."</span> }
+    ]
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="messages-status">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/messages/status/:messageId</span>
+        <span class="endpoint-summary">Delivery status</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Look up delivery status using the <code>messageId</code> returned from a send call.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl https://vaartabot.com/api/v1/messages/status/wamid.HBgM... \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"status"</span>:        <span class="tk-str">"delivered"</span>,  <span class="tk-cm">// sent | delivered | read | failed</span>
+    <span class="tk-key">"sent_at"</span>:      <span class="tk-str">"2026-07-12T09:15:00.000Z"</span>,
+    <span class="tk-key">"delivered_at"</span>: <span class="tk-str">"2026-07-12T09:15:04.000Z"</span>,
+    <span class="tk-key">"read_at"</span>:      <span class="tk-null">null</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="messages-logs">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/messages/logs</span>
+        <span class="endpoint-summary">Full message history — inbound &amp; outbound</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Paginated message history. Use <code>direction=inbound</code> to see only replies, <code>direction=outbound</code> for sent messages, or omit for all. Filter by a specific contact with <code>phone</code>.</p>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Param</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>direction</td><td>—</td><td><code>inbound</code> | <code>outbound</code> — omit for all messages</td></tr>
+            <tr><td>phone</td><td>—</td><td>Filter to one contact's conversation</td></tr>
+            <tr><td>limit</td><td>20</td><td>Max records per page (up to 100)</td></tr>
+            <tr><td>offset</td><td>0</td><td>Pagination offset</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl "https://vaartabot.com/api/v1/messages/logs?direction=inbound&limit=50" \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="messages-inbox">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/messages/inbox</span>
+        <span class="endpoint-summary">Inbox — inbound replies only</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Returns only messages sent by WhatsApp users to your business number. Optionally filter to one contact's conversation using <code>phone</code>.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl "https://vaartabot.com/api/v1/messages/inbox?phone=919876543210" \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: [
+    {
+      <span class="tk-key">"id"</span>:            <span class="tk-num">2848</span>,
+      <span class="tk-key">"contact_phone"</span>: <span class="tk-str">"919876543210"</span>,
+      <span class="tk-key">"message"</span>:       <span class="tk-str">"I want to book an appointment"</span>,
+      <span class="tk-key">"status"</span>:        <span class="tk-str">"received"</span>,
+      <span class="tk-key">"received_at"</span>:   <span class="tk-str">"2026-07-12T09:30:00.000Z"</span>,
+      <span class="tk-key">"message_id"</span>:    <span class="tk-str">"wamid.HBgM..."</span>
+    }
+  ],
+  <span class="tk-key">"limit"</span>: <span class="tk-num">20</span>, <span class="tk-key">"offset"</span>: <span class="tk-num">0</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TEMPLATES ──────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2>Templates</h2>
+    <p>Manage your WhatsApp message templates. Templates must be approved by Meta before they can be used in send calls. Fetch your existing templates or submit new ones for approval directly via API.</p>
+
+    <div class="endpoint open" id="templates-list">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/templates</span>
+        <span class="endpoint-summary">List all templates from Meta</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Fetches all message templates for your WhatsApp Business Account directly from Meta. Filter by <code>status</code> or <code>category</code>.</p>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Param</th><th>Values</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>status</td><td><code>APPROVED</code> | <code>PENDING</code> | <code>REJECTED</code></td><td>Filter by approval status</td></tr>
+            <tr><td>category</td><td><code>MARKETING</code> | <code>UTILITY</code> | <code>AUTHENTICATION</code></td><td>Filter by category</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl "https://vaartabot.com/api/v1/templates?status=APPROVED" \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"total"</span>: <span class="tk-num">2</span>,
+  <span class="tk-key">"data"</span>: [
+    {
+      <span class="tk-key">"id"</span>:         <span class="tk-str">"123456789"</span>,
+      <span class="tk-key">"name"</span>:       <span class="tk-str">"order_confirmation"</span>,
+      <span class="tk-key">"status"</span>:     <span class="tk-str">"APPROVED"</span>,
+      <span class="tk-key">"category"</span>:   <span class="tk-str">"UTILITY"</span>,
+      <span class="tk-key">"language"</span>:   <span class="tk-str">"en"</span>,
+      <span class="tk-key">"components"</span>: [
+        { <span class="tk-key">"type"</span>: <span class="tk-str">"BODY"</span>, <span class="tk-key">"text"</span>: <span class="tk-str">"Hi {{1}}, your order {{2}} is confirmed."</span> }
+      ]
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="templates-sync">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/templates/sync</span>
+        <span class="endpoint-summary">Force sync from Meta</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Same as <code>GET /templates</code> but always re-fetches fresh data from Meta and includes a <code>synced_at</code> timestamp.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl https://vaartabot.com/api/v1/templates/sync \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>:    <span class="tk-bool">true</span>,
+  <span class="tk-key">"total"</span>:     <span class="tk-num">4</span>,
+  <span class="tk-key">"synced_at"</span>: <span class="tk-str">"2026-07-12T09:45:00.000Z"</span>,
+  <span class="tk-key">"data"</span>: [ <span class="tk-cm">/* ... */</span> ]
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="templates-create">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/templates</span>
+        <span class="endpoint-summary">Submit a new template for approval</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Submit a new WhatsApp message template to Meta for review. Use <code>{{1}}</code>, <code>{{2}}</code> … for variable placeholders in the BODY component. Approval typically takes a few minutes to 24 hours.</p>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>Lowercase, underscores only — e.g. <code>order_confirmation</code></td></tr>
+            <tr><td>category <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td><code>MARKETING</code> | <code>UTILITY</code> | <code>AUTHENTICATION</code></td></tr>
+            <tr><td>language <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>e.g. <code>en</code>, <code>en_US</code>, <code>hi</code></td></tr>
+            <tr><td>components <span class="req-badge">required</span></td><td><span class="type-pill">array</span></td><td>Meta template components — HEADER, BODY, FOOTER, BUTTONS</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X POST https://vaartabot.com/api/v1/templates \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span> \
+  -H <span class="tk-str">"Content-Type: application/json"</span> \
+  -d <span class="tk-str">'{
+    "name": "order_confirmation",
+    "category": "UTILITY",
+    "language": "en",
+    "components": [
+      { "type": "HEADER", "format": "TEXT", "text": "Order Update" },
+      { "type": "BODY",   "text": "Hi {{1}}, order {{2}} confirmed. Arrives {{3}}." },
+      { "type": "FOOTER", "text": "Reply STOP to opt out." }
+    ]
+  }'</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 201</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"templateId"</span>: <span class="tk-str">"987654321"</span>,
+    <span class="tk-key">"name"</span>:       <span class="tk-str">"order_confirmation"</span>,
+    <span class="tk-key">"category"</span>:   <span class="tk-str">"UTILITY"</span>,
+    <span class="tk-key">"language"</span>:   <span class="tk-str">"en"</span>,
+    <span class="tk-key">"status"</span>:     <span class="tk-str">"PENDING"</span>,
+    <span class="tk-key">"note"</span>:       <span class="tk-str">"Template submitted for Meta review. Approval typically takes a few minutes to 24 hours."</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── WEBHOOKS ───────────────────────────────────────────────────────── -->
+  <section class="section">
+    <h2>Webhooks</h2>
+    <p>Register HTTPS endpoints to receive real-time push notifications when WhatsApp events occur in your account. Vaartabot POSTs a signed JSON payload to your URL — no polling needed.</p>
+    <div class="events-list">
+      <span class="event-chip">message.received</span>
+      <span class="event-chip">message.delivered</span>
+      <span class="event-chip">message.read</span>
+      <span class="event-chip">message.failed</span>
+    </div>
+
+    <div class="endpoint open" id="webhooks-list">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/webhooks</span>
+        <span class="endpoint-summary">List registered webhook endpoints</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Returns all webhook subscriptions for this account, including their active status and failure count.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl https://vaartabot.com/api/v1/webhooks \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: [
+    {
+      <span class="tk-key">"id"</span>:             <span class="tk-num">1</span>,
+      <span class="tk-key">"name"</span>:           <span class="tk-str">"My CRM"</span>,
+      <span class="tk-key">"url"</span>:            <span class="tk-str">"https://mycrm.com/webhooks/whatsapp"</span>,
+      <span class="tk-key">"events"</span>:         <span class="tk-str">"message.received"</span>,
+      <span class="tk-key">"is_active"</span>:      <span class="tk-bool">true</span>,
+      <span class="tk-key">"failure_count"</span>:  <span class="tk-num">0</span>,
+      <span class="tk-key">"last_triggered"</span>: <span class="tk-str">"2026-07-12T09:30:00.000Z"</span>
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="webhooks-create">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/webhooks</span>
+        <span class="endpoint-summary">Register a callback URL</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Register an HTTPS endpoint to receive push events. The <code>secret</code> is returned once — use it to verify the <code>X-Vaartabot-Signature</code> header on incoming events. Max 5 webhooks per account.</p>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>name <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>Friendly label, e.g. <code>"My CRM"</code></td></tr>
+            <tr><td>url <span class="req-badge">required</span></td><td><span class="type-pill">string</span></td><td>HTTPS endpoint that accepts POST requests</td></tr>
+            <tr><td>events</td><td><span class="type-pill">string[]</span></td><td>Events to receive. Default: <code>["message.received"]</code></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X POST https://vaartabot.com/api/v1/webhooks \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span> \
+  -H <span class="tk-str">"Content-Type: application/json"</span> \
+  -d <span class="tk-str">'{
+    "name": "My CRM",
+    "url": "https://mycrm.com/webhooks/whatsapp",
+    "events": ["message.received"]
+  }'</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 201</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"id"</span>:        <span class="tk-num">1</span>,
+    <span class="tk-key">"name"</span>:      <span class="tk-str">"My CRM"</span>,
+    <span class="tk-key">"url"</span>:       <span class="tk-str">"https://mycrm.com/webhooks/whatsapp"</span>,
+    <span class="tk-key">"events"</span>:    [<span class="tk-str">"message.received"</span>],
+    <span class="tk-key">"is_active"</span>: <span class="tk-bool">true</span>,
+    <span class="tk-key">"secret"</span>:    <span class="tk-str">"a3f9c2e1d8b7..."</span>,
+    <span class="tk-key">"note"</span>:      <span class="tk-str">"Save your signing secret now — it will not be shown again."</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="webhooks-test">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/webhooks/:id/test</span>
+        <span class="endpoint-summary">Send a test ping to your endpoint</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Sends a signed test event to your registered URL so you can verify receipt and signature validation before going live. Returns the HTTP status your server responded with.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X POST https://vaartabot.com/api/v1/webhooks/1/test \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"url"</span>:        <span class="tk-str">"https://mycrm.com/webhooks/whatsapp"</span>,
+    <span class="tk-key">"statusCode"</span>: <span class="tk-num">200</span>,
+    <span class="tk-key">"message"</span>:    <span class="tk-str">"Test ping delivered — your server responded 200"</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="webhooks-update">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-patch">PATCH</span>
+        <span class="endpoint-path">/webhooks/:id</span>
+        <span class="endpoint-summary">Update or pause a webhook</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Update the URL, name, subscribed events, or toggle the webhook on/off without deleting it.</p>
+        <div style="overflow-x:auto">
+        <table class="params-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>url</td><td><span class="type-pill">string</span></td><td>New HTTPS URL</td></tr>
+            <tr><td>name</td><td><span class="type-pill">string</span></td><td>New label</td></tr>
+            <tr><td>events</td><td><span class="type-pill">string[]</span></td><td>New event list</td></tr>
+            <tr><td>is_active</td><td><span class="type-pill">boolean</span></td><td><code>false</code> to pause, <code>true</code> to resume</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL — pause webhook</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X PATCH https://vaartabot.com/api/v1/webhooks/1 \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span> \
+  -H <span class="tk-str">"Content-Type: application/json"</span> \
+  -d <span class="tk-str">'{ "is_active": false }'</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{ <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>, <span class="tk-key">"message"</span>: <span class="tk-str">"Webhook updated"</span> }</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="webhooks-delete">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-del">DEL</span>
+        <span class="endpoint-path">/webhooks/:id</span>
+        <span class="endpoint-summary">Remove a webhook permanently</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Permanently removes the webhook subscription. No more events will be pushed to that URL. Use <code>PATCH</code> with <code>is_active: false</code> to pause temporarily instead.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X DELETE https://vaartabot.com/api/v1/webhooks/1 \
+  -H <span class="tk-str">"X-API-Key: vb_your_api_key"</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{ <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>, <span class="tk-key">"message"</span>: <span class="tk-str">"Webhook deleted"</span> }</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="webhooks-payload" style="margin-top:32px;margin-bottom:0">
+      <h3 style="margin-top:0">Push payload format</h3>
+      <p>Vaartabot sends this JSON body to your registered URL for every subscribed event. The raw body is signed with HMAC-SHA256 using your subscription secret.</p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">JSON — event payload</span></div>
+<pre>{
+  <span class="tk-key">"event"</span>:     <span class="tk-str">"message.received"</span>,
+  <span class="tk-key">"tenant_id"</span>: <span class="tk-num">42</span>,
+  <span class="tk-key">"timestamp"</span>: <span class="tk-str">"2026-07-12T09:30:00.000Z"</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"message_id"</span>:  <span class="tk-str">"wamid.HBgM..."</span>,
+    <span class="tk-key">"from"</span>:         <span class="tk-str">"919876543210"</span>,
+    <span class="tk-key">"type"</span>:         <span class="tk-str">"text"</span>,
+    <span class="tk-key">"text"</span>:         <span class="tk-str">"I want to book an appointment"</span>,
+    <span class="tk-key">"received_at"</span>:  <span class="tk-str">"2026-07-12T09:30:00.000Z"</span>
+  }
+}</pre>
+      </div>
+      <h3>Verifying the signature</h3>
+      <p>Every request includes an <code>X-Vaartabot-Signature</code> header in the format <code>sha256=&lt;hex&gt;</code>. Always verify it before processing the event.</p>
+      <div class="code-block">
+        <div class="code-header"><span class="code-lang">Node.js — Express</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>const crypto = require(<span class="tk-str">'crypto'</span>);
+
+<span class="tk-cm">// IMPORTANT: parse as raw Buffer, not JSON</span>
+app.post(<span class="tk-str">'/webhooks/whatsapp'</span>, express.raw({ type: <span class="tk-str">'application/json'</span> }), (req, res) => {
+  const sig      = req.headers[<span class="tk-str">'x-vaartabot-signature'</span>];
+  const expected = <span class="tk-str">'sha256='</span> + crypto
+    .createHmac(<span class="tk-str">'sha256'</span>, process.env.WEBHOOK_SECRET)
+    .update(req.body)
+    .digest(<span class="tk-str">'hex'</span>);
+
+  if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) {
+    return res.status(<span class="tk-num">401</span>).send(<span class="tk-str">'Invalid signature'</span>);
+  }
+
+  const event = JSON.parse(req.body);
+  console.log(<span class="tk-str">'Reply from'</span>, event.data.from, <span class="tk-str">':'</span>, event.data.text);
+  res.sendStatus(<span class="tk-num">200</span>);  <span class="tk-cm">// acknowledge within 8 s</span>
+});</pre>
+      </div>
+      <div class="warn-box" style="margin-top:8px">
+        <span>⚠️</span>
+        <span>Your endpoint must respond with any 2xx status within <strong>8 seconds</strong>. Slower responses count as failures. A <code>failure_count</code> counter increments on each failed delivery — monitor it with <code>GET /webhooks</code>.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── API KEY MANAGEMENT ────────────────────────────────────────────── -->
+  <section class="section">
+    <h2>API Key Management</h2>
+    <p>These endpoints use a <strong>Vaartabot session JWT</strong> in <code>Authorization: Bearer</code> — not an API key. Use them to let your CRM users manage their own keys from inside your dashboard.</p>
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">Base path (JWT auth)</span></div>
+<pre>https://vaartabot.com/api/api-keys</pre>
+    </div>
+
+    <div class="endpoint" id="apikeys-list">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-get">GET</span>
+        <span class="endpoint-path">/api-keys</span>
+        <span class="endpoint-summary">List keys</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Returns all API keys for the tenant. Full key values are never returned — only the 12-char prefix.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 200</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"data"</span>: [
+    {
+      <span class="tk-key">"id"</span>: <span class="tk-num">3</span>, <span class="tk-key">"name"</span>: <span class="tk-str">"My CRM Key"</span>,
+      <span class="tk-key">"key_prefix"</span>: <span class="tk-str">"vb_a1b2c3d4e5"</span>,
+      <span class="tk-key">"is_active"</span>: <span class="tk-bool">true</span>,
+      <span class="tk-key">"last_used"</span>: <span class="tk-str">"2026-07-12T07:30:00.000Z"</span>
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="apikeys-create">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-post">POST</span>
+        <span class="endpoint-path">/api-keys</span>
+        <span class="endpoint-summary">Generate a new key</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Creates a new API key. The <code>key</code> value is shown only once — store it immediately.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">JSON · 201</span></div>
+<pre>{
+  <span class="tk-key">"success"</span>: <span class="tk-bool">true</span>,
+  <span class="tk-key">"message"</span>: <span class="tk-str">"Save this key now — it will not be shown again."</span>,
+  <span class="tk-key">"data"</span>: {
+    <span class="tk-key">"name"</span>:      <span class="tk-str">"Zoho CRM Integration"</span>,
+    <span class="tk-key">"key"</span>:       <span class="tk-str">"vb_a1b2c3d4e5f6789abc..."</span>,
+    <span class="tk-key">"keyPrefix"</span>: <span class="tk-str">"vb_a1b2c3d4e5"</span>
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="endpoint" id="apikeys-revoke">
+      <div class="endpoint-header" onclick="toggleEndpoint(this)">
+        <span class="method-badge m-del">DEL</span>
+        <span class="endpoint-path">/api-keys/:id</span>
+        <span class="endpoint-summary">Revoke a key permanently</span>
+        <span class="chevron">▶</span>
+      </div>
+      <div class="endpoint-body">
+        <p class="endpoint-desc">Permanently deletes a key — any CRM using it immediately gets 401 errors. Use <code>PATCH /api-keys/:id</code> with <code>is_active: false</code> to temporarily disable instead.</p>
+        <div class="code-block">
+          <div class="code-header"><span class="code-lang">cURL</span><button class="copy-btn" onclick="copyBlock(this)">Copy</button></div>
+<pre>curl -X DELETE https://vaartabot.com/api/api-keys/3 \
+  -H <span class="tk-str">"Authorization: Bearer YOUR_SESSION_JWT"</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr>
+
+  <section class="section" id="purchase-flow">
+    <h2>Credit Purchase Flow</h2>
+    <p>Credits are bought in the Vaartabot dashboard — not via API. Guide your users through this flow:</p>
+    <div style="overflow-x:auto">
+    <table class="params-table">
+      <thead><tr><th>#</th><th>Who</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Client</td><td>Logs into <a href="https://vaartabot.com">vaartabot.com</a> → Billing → picks a credit package</td></tr>
+        <tr><td>2</td><td>Vaartabot</td><td>Creates a Cashfree payment order, redirects to checkout</td></tr>
+        <tr><td>3</td><td>Client</td><td>Pays via UPI / card / netbanking</td></tr>
+        <tr><td>4</td><td>Cashfree</td><td>Sends webhook — credits added to account automatically</td></tr>
+        <tr><td>5</td><td>Your CRM</td><td>Polls <code>GET /api/v1/credits/balance</code> to confirm new balance and unlock campaigns</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="section" id="rate-limits">
+    <h2>Rate Limits</h2>
+    <div style="overflow-x:auto">
+    <table class="params-table">
+      <thead><tr><th>Scope</th><th>Limit</th><th>Window</th></tr></thead>
+      <tbody>
+        <tr><td>All <code>/api/v1/</code> endpoints</td><td>100 requests</td><td>Per minute per API key</td></tr>
+        <tr><td><code>POST /messages/send</code></td><td>60 messages</td><td>Per minute per account</td></tr>
+        <tr><td><code>POST /messages/bulk-send</code></td><td>500 recipients</td><td>Per request</td></tr>
+        <tr><td>WhatsApp (Meta)</td><td>~1 msg / sec</td><td>Built-in 300 ms throttle between recipients</td></tr>
+        <tr><td>Webhook delivery timeout</td><td>8 seconds</td><td>Per event push — respond with 2xx within this window</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="margin-top:12px">Rate limit hits return <code>429 Too Many Requests</code> with a <code>Retry-After</code> header in seconds.</p>
+  </section>
+</main>
+
+<script>
+function toggleEndpoint(header) {
+  header.closest('.endpoint').classList.toggle('open');
+}
+function copyBlock(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1800);
+  });
+}
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark' || (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const next = isDark ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+  document.getElementById('theme-icon').textContent = window.matchMedia('(prefers-color-scheme: dark)').matches ? '☀️' : '🌙';
+})();
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.nav-link[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+document.querySelectorAll('[id]').forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

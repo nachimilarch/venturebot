@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopNavbar from './TopNavbar';
+import OnboardingWizard from '@/components/OnboardingWizard';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const AppLayout: React.FC = () => {
@@ -74,6 +75,7 @@ const AppLayout: React.FC = () => {
           </motion.div>
         </main>
       </div>
+      <OnboardingWizard />
     </div>
   );
 };

@@ -41,15 +41,6 @@ const TopNavbar: React.FC<TopNavbarProps> = ({
         )}
       </button>
 
-      {/* Search Bar */}
-      <div className="hidden md:flex flex-1 max-w-md relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search leads, campaigns..." 
-          className="pl-10 bg-muted/50 border-transparent focus:border-border focus:bg-background"
-        />
-      </div>
-
       <div className="flex-1 md:hidden" />
 
       {/* Right Section */}
@@ -65,19 +56,6 @@ const TopNavbar: React.FC<TopNavbarProps> = ({
           </span>
           <span className="text-xs text-muted-foreground">credits</span>
         </motion.div>
-
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
-        </Button>
-
-        {/* Mobile Logo */}
-        <div className="flex lg:hidden items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-tenant-accent flex items-center justify-center text-sm">
-            {tenant?.logo || '🏠'}
-          </div>
-        </div>
       </div>
     </header>
   );

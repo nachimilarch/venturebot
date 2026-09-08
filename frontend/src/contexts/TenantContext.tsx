@@ -13,10 +13,6 @@ import {
   ChartData
 } from '@/types/tenant';
 
-// Backend is on 3000 per your logs
-axios.defaults.baseURL = 'http://localhost:3000';
-axios.defaults.withCredentials = true;
-
 interface TenantContextType {
   tenant: Tenant | null;
   campaigns: Campaign[];
@@ -64,7 +60,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   useEffect(() => {
     console.log('[TenantContext] useEffect triggered with tenantId:', tenantId);
-    
+
     if (!tenantId) {
       console.log('[TenantContext] No tenantId, clearing all data');
       setTenant(null);
@@ -84,7 +80,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const loadTenantData = async () => {
       setLoading(true);
       console.log('[TenantContext] Starting to load tenant data...');
-      
+
       try {
         // 1) Tenant profile
         try {
@@ -106,7 +102,8 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
               messagesSent: d.messagesSent,
               newLeads: d.newLeads,
               upcomingAppointments: d.upcomingAppointments,
-              conversionRate: d.conversionRate
+              conversionRate: d.conversionRate,
+              activeCampaigns: d.activeCampaigns || 0
             });
           }
         } catch (error) {
@@ -160,7 +157,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.log('[TenantContext] Campaigns raw response:', campRes);
           console.log('[TenantContext] Campaigns data:', campRes.data);
           console.log('[TenantContext] Is array?', Array.isArray(campRes.data));
-          
+
           if (Array.isArray(campRes.data)) {
             setCampaigns(campRes.data);
             console.log('[TenantContext] Campaigns set successfully, count:', campRes.data.length);
@@ -188,7 +185,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         console.log('[TenantContext] Finished loading tenant data');
       }
     };
-    
+
     loadTenantData();
   }, [tenantId]);
 

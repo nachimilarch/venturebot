@@ -88,7 +88,7 @@ export interface DashboardStats {
   newLeads: number;
   upcomingAppointments: number;
   conversionRate: number;
-  activeActiveCampaigns: number;
+  activeCampaigns: number;
 }
 
 export interface ChartData {

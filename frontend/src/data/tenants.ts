@@ -251,7 +251,7 @@ export const getDashboardStats = (tenantId: string): DashboardStats => {
     newLeads: leads.filter(l => l.status === 'new').length,
     upcomingAppointments,
     conversionRate,
-    activeActiveCampaigns: activeCampaigns
+    activeCampaigns: activeCampaigns
   };
 };
 

@@ -3,50 +3,49 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  MessageSquare, Mail, Lock, ArrowRight, Eye, EyeOff,
-  Zap, Shield, BarChart3, Users
+  Users, Mail, Lock, ArrowRight, Eye, EyeOff,
+  GitBranch, Shield, BarChart3,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useAuth }  from '@/contexts/AuthContext';
+import { Button }   from '@/components/ui/button';
+import { Input }    from '@/components/ui/input';
+import { Label }    from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 // ─── Static content ───────────────────────────────────────────────────────────
-// Change these without touching component logic.
 
 const BRAND = {
-  name: 'VaartaBot',
-  tagline: 'WhatsApp Automation Platform',
-  hero: 'Automate conversations. Convert leads. Grow faster.',
-  sub: 'Send bulk campaigns, manage leads, and run WhatsApp auto-replies — all from one platform.',
-  trust: 'Trusted by growing businesses across India',
+  name:    'VaartaBot',
+  tagline: 'Lead Management Platform',
+  hero:    'Manage leads. Connect tools. Close faster.',
+  sub:     'Centralise your leads, track every interaction, and integrate with any software — all from one dashboard.',
+  trust:   'Trusted by growing businesses across India',
 };
 
 const STATS = [
-  { label: 'Messages Delivered', value: '2.5M+' },
-  { label: 'Active Businesses', value: '500+' },
-  { label: 'Campaigns Sent', value: '12K+' },
-  { label: 'Delivery Rate', value: '98.4%' },
+  { label: 'Leads Managed',     value: '1.2M+' },
+  { label: 'Active Businesses', value: '500+'  },
+  { label: 'API Integrations',  value: '40+'   },
+  { label: 'Conversion Uplift', value: '3.2x'  },
 ];
 
 const FEATURES = [
-  { icon: Zap, text: 'Bulk campaigns in minutes' },
-  { icon: Shield, text: 'Secure multi-tenant architecture' },
-  { icon: BarChart3, text: 'Real-time delivery analytics' },
+  { icon: Users,     text: 'Centralised lead inbox from all sources' },
+  { icon: BarChart3, text: 'Real-time pipeline analytics'            },
+  { icon: Shield,    text: 'Role-based access & secure workspaces'   },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading]       = useState(false);
 
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { login }    = useAuth();
+  const navigate     = useNavigate();
+  const { toast }    = useToast();
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,9 +53,9 @@ const Login: React.FC = () => {
 
     if (!email.trim() || !password.trim()) {
       toast({
-        title: 'Missing fields',
+        title:       'Missing fields',
         description: 'Please enter your email and password.',
-        variant: 'destructive',
+        variant:     'destructive',
       });
       return;
     }
@@ -67,22 +66,22 @@ const Login: React.FC = () => {
 
       if (success) {
         toast({
-          title: 'Welcome back!',
+          title:       'Welcome back!',
           description: 'Signed in successfully.',
         });
         navigate('/dashboard');
       } else {
         toast({
-          title: 'Sign in failed',
+          title:       'Sign in failed',
           description: 'Invalid email or password. Please try again.',
-          variant: 'destructive',
+          variant:     'destructive',
         });
       }
     } catch {
       toast({
-        title: 'Something went wrong',
+        title:       'Something went wrong',
         description: 'Please check your connection and try again.',
-        variant: 'destructive',
+        variant:     'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -114,12 +113,10 @@ const Login: React.FC = () => {
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-tenant-accent flex items-center justify-center shadow-lg">
-            <MessageSquare className="w-6 h-6 text-white" />
+            <Users className="w-6 h-6 text-white" />
           </div>
           <div>
-            <p className="text-xl font-bold text-sidebar-foreground tracking-tight">
-              {BRAND.name}
-            </p>
+            <p className="text-xl font-bold text-sidebar-foreground tracking-tight">{BRAND.name}</p>
             <p className="text-xs text-sidebar-muted">{BRAND.tagline}</p>
           </div>
         </div>
@@ -132,12 +129,8 @@ const Login: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25, duration: 0.5 }}
           >
-            <h2 className="text-4xl font-bold text-sidebar-foreground leading-tight">
-              {BRAND.hero}
-            </h2>
-            <p className="text-sidebar-muted text-lg leading-relaxed">
-              {BRAND.sub}
-            </p>
+            <h2 className="text-4xl font-bold text-sidebar-foreground leading-tight">{BRAND.hero}</h2>
+            <p className="text-sidebar-muted text-lg leading-relaxed">{BRAND.sub}</p>
           </motion.div>
 
           {/* Feature pills */}
@@ -153,6 +146,21 @@ const Login: React.FC = () => {
                   <Icon className="w-4 h-4 text-tenant-accent" />
                 </div>
                 <span className="text-sidebar-muted text-sm">{text}</span>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Stats strip */}
+          <motion.div
+            className="grid grid-cols-2 gap-3 pt-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.55, duration: 0.5 }}
+          >
+            {STATS.map(s => (
+              <div key={s.label} className="bg-sidebar-accent/50 border border-sidebar-border rounded-xl p-3">
+                <p className="text-lg font-bold text-sidebar-foreground">{s.value}</p>
+                <p className="text-[11px] text-sidebar-muted">{s.label}</p>
               </div>
             ))}
           </motion.div>
@@ -175,10 +183,10 @@ const Login: React.FC = () => {
       >
         <div className="w-full max-w-md space-y-8">
 
-          {/* Mobile logo — only visible on small screens */}
+          {/* Mobile logo */}
           <div className="flex items-center gap-3 lg:hidden">
             <div className="w-10 h-10 rounded-xl bg-tenant-accent flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
+              <Users className="w-5 h-5 text-white" />
             </div>
             <p className="text-lg font-bold text-foreground">{BRAND.name}</p>
           </div>
@@ -191,15 +199,10 @@ const Login: React.FC = () => {
             transition={{ delay: 0.2, duration: 0.45 }}
           >
             <h2 className="text-3xl font-bold text-foreground">Sign in</h2>
-            <p className="text-muted-foreground">
-              Access your {BRAND.name} dashboard
-            </p>
+            <p className="text-muted-foreground">Access your {BRAND.name} dashboard</p>
             <p className="text-sm text-muted-foreground pt-1">
               Don&apos;t have an account?{' '}
-              <Link
-                to="/register"
-                className="text-tenant-accent hover:underline font-medium"
-              >
+              <Link to="/register" className="text-tenant-accent hover:underline font-medium">
                 Create one free
               </Link>
             </p>
@@ -218,7 +221,7 @@ const Login: React.FC = () => {
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground pointer-events-none" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
                   id="email"
                   type="email"
@@ -237,7 +240,6 @@ const Login: React.FC = () => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                {/* Forgot password — wire up route when ready */}
                 <Link
                   to="/forgot-password"
                   className="text-xs text-muted-foreground hover:text-tenant-accent transition-colors"
@@ -246,7 +248,7 @@ const Login: React.FC = () => {
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground pointer-events-none" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -265,10 +267,7 @@ const Login: React.FC = () => {
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   tabIndex={-1}
                 >
-                  {showPassword
-                    ? <EyeOff className="w-4.5 h-4.5" />
-                    : <Eye className="w-4.5 h-4.5" />
-                  }
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -282,12 +281,11 @@ const Login: React.FC = () => {
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Signing in…
+                  Signing in...
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
-                  Sign in
-                  <ArrowRight className="w-4 h-4" />
+                  Sign in <ArrowRight className="w-4 h-4" />
                 </span>
               )}
             </Button>
@@ -301,7 +299,7 @@ const Login: React.FC = () => {
             transition={{ delay: 0.6, duration: 0.4 }}
           >
             By signing in, you agree to our{' '}
-            <Link to="/terms" className="hover:text-tenant-accent underline underline-offset-2">Terms of Service</Link>
+            <Link to="/terms"   className="hover:text-tenant-accent underline underline-offset-2">Terms of Service</Link>
             {' '}and{' '}
             <Link to="/privacy" className="hover:text-tenant-accent underline underline-offset-2">Privacy Policy</Link>.
           </motion.p>
