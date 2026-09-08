@@ -127,7 +127,11 @@ export default function Contacts() {
       const { data } = await api.post('/api/ai/contact-summary', { contactId: c.id });
       setAiSummaryText(data.summary || '');
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'AI unavailable');
+      if (err.response?.data?.code === 'NO_AI_TOKENS') {
+        toast.error('AI token balance empty', { description: 'Top up in Billing → AI Tokens', action: { label: 'Billing', onClick: () => { window.location.href = '/billing'; } } });
+      } else {
+        toast.error(err.response?.data?.error || 'AI unavailable');
+      }
       setAiSummaryContact(null);
     } finally { setAiSummaryLoading(false); }
   };
