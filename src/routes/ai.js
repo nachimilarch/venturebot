@@ -292,27 +292,18 @@ router.post('/campaign-insights', async (req, res) => {
     const tenantId = req.user.tenantId;
 
     const [[campaign]] = await pool.execute(
-      'SELECT name, status, target_audience FROM campaigns WHERE id = ? AND tenant_id = ?',
+      `SELECT name, status, target_audience,
+              messages_sent, messages_delivered, messages_read, messages_failed
+       FROM campaigns WHERE id = ? AND tenant_id = ?`,
       [campaignId, tenantId]
     );
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
 
-    const [[stats]] = await pool.execute(
-      `SELECT
-         COUNT(*) AS total,
-         SUM(status = 'sent')      AS sent,
-         SUM(status = 'delivered') AS delivered,
-         SUM(status = 'read')      AS read_count,
-         SUM(status = 'failed')    AS failed
-       FROM campaign_logs WHERE campaign_id = ? AND tenant_id = ?`,
-      [campaignId, tenantId]
-    );
-
-    const total     = stats.total     || 0;
-    const sent      = stats.sent      || 0;
-    const delivered = stats.delivered || 0;
-    const readCount = stats.read_count || 0;
-    const failed    = stats.failed    || 0;
+    const sent      = Number(campaign.messages_sent)      || 0;
+    const delivered = Number(campaign.messages_delivered) || 0;
+    const readCount = Number(campaign.messages_read)      || 0;
+    const failed    = Number(campaign.messages_failed)    || 0;
+    const total     = sent + failed;
     const delivRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
     const readRate  = delivered > 0 ? Math.round((readCount / delivered) * 100) : 0;
 
