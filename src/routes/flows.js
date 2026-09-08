@@ -82,4 +82,30 @@ router.patch('/:flowId/activate', async (req, res) => {
     res.json({ success: true });
 });
 
+// PUT /api/flows/:flowId — rename a flow
+router.put('/:flowId', async (req, res) => {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+    await pool.execute(
+        'UPDATE flows SET name = ? WHERE id = ? AND tenant_id = ?',
+        [name.trim(), req.params.flowId, req.user.tenantId]
+    );
+    res.json({ success: true });
+});
+
+// DELETE /api/flows/:flowId — delete a flow and all its nodes
+router.delete('/:flowId', async (req, res) => {
+    await pool.execute(
+        'DELETE FROM flow_nodes WHERE flow_id = ? AND tenant_id = ?',
+        [req.params.flowId, req.user.tenantId]
+    );
+    await pool.execute(
+        'DELETE FROM flows WHERE id = ? AND tenant_id = ?',
+        [req.params.flowId, req.user.tenantId]
+    );
+    invalidateFlowCache(req.user.tenantId);
+    invalidateFlowConfig(req.user.tenantId);
+    res.json({ success: true });
+});
+
 export default router;
