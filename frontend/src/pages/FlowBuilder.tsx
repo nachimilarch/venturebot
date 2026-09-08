@@ -5,6 +5,7 @@ import {
   Plus, Trash2, Edit, ArrowDown, Play, Pause,
   ChevronLeft, MessageSquare, List, MousePointerClick,
   FileText, Tag, Square, Save, RefreshCw, Zap, Sparkles, Loader2,
+  MoreVertical, Pencil,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -19,6 +20,10 @@ import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { cn }    from '@/lib/utils';
 import api       from '@/lib/api';
 import { toast } from 'sonner';
@@ -57,6 +62,8 @@ export default function FlowBuilder() {
   const [newName, setNewName]   = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [renameFlow, setRenameFlow] = useState<Flow | null>(null);
+  const [renameName, setRenameName] = useState('');
 
   const fetchFlows = useCallback(async () => {
     setLoading(true);
@@ -90,6 +97,25 @@ export default function FlowBuilder() {
       fetchFlows();
       toast.success(flow.is_active ? 'Flow paused' : 'Flow activated');
     } catch { toast.error('Update failed'); }
+  };
+
+  const deleteFlow = async (flow: Flow) => {
+    if (!confirm(`Delete flow "${flow.name}"? All its nodes will be removed.`)) return;
+    try {
+      await api.delete(`/api/flows/${flow.id}`);
+      toast.success('Flow deleted');
+      fetchFlows();
+    } catch { toast.error('Delete failed'); }
+  };
+
+  const saveRename = async () => {
+    if (!renameFlow || !renameName.trim()) return;
+    try {
+      await api.put(`/api/flows/${renameFlow.id}`, { name: renameName.trim() });
+      toast.success('Flow renamed');
+      setRenameFlow(null);
+      fetchFlows();
+    } catch { toast.error('Rename failed'); }
   };
 
   if (activeFlow) {
@@ -140,13 +166,31 @@ export default function FlowBuilder() {
               onClick={() => setActiveFlow(flow)}
               className="rounded-xl border bg-card p-4 cursor-pointer hover:shadow-md transition-shadow space-y-3"
             >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold truncate">{flow.name}</span>
-                <Switch
-                  checked={!!flow.is_active}
-                  onCheckedChange={() => {}}
-                  onClick={e => toggleFlow(flow, e)}
-                />
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold truncate flex-1">{flow.name}</span>
+                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                  <Switch
+                    checked={!!flow.is_active}
+                    onCheckedChange={() => {}}
+                    onClick={e => toggleFlow(flow, e)}
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <MoreVertical className="w-3.5 h-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setRenameFlow(flow); setRenameName(flow.name); }}>
+                        <Pencil className="w-3.5 h-3.5 mr-2" /> Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => deleteFlow(flow)}>
+                        <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {flow.is_active
@@ -174,6 +218,23 @@ export default function FlowBuilder() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
               <Button onClick={createFlow} disabled={creating}>{creating ? 'Creating…' : 'Create'}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!renameFlow} onOpenChange={v => { if (!v) setRenameFlow(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Rename Flow</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div>
+              <Label>New name</Label>
+              <Input value={renameName} onChange={e => setRenameName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveRename()} autoFocus />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRenameFlow(null)}>Cancel</Button>
+              <Button onClick={saveRename}>Save</Button>
             </div>
           </div>
         </DialogContent>
