@@ -3,32 +3,36 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageSquare, ArrowLeft } from 'lucide-react';
 
-const LAST_UPDATED = '17-04-2026 20:00:56';
+const LAST_UPDATED = '08-09-2026';
 
 const SECTIONS = [
   {
-    title: '1. Cancellation Policy',
-    body: `Cancellations will be considered only if the request is made immediately after placing the order. However, the cancellation request may not be entertained if the orders have been communicated to the vendors/merchants and they have initiated the process of shipping them.`,
+    title: '1. Nature of Service',
+    body: `VaartaBot is a digital software-as-a-service (SaaS) platform. All purchases on VaartaBot are for prepaid messaging credits or AI token packs ("Credits") that are consumed electronically. Because Credits are digital goods delivered immediately upon purchase, they are generally non-refundable once allocated to your account.`,
   },
   {
-    title: '2. Non-Cancellable Items',
-    body: `NACHIKETH M DESAI does not accept cancellation requests for perishable items like flowers, eatables etc. However, refund/replacement can be made if the customer establishes that the quality of product delivered is not good.`,
+    title: '2. Cancellation Before Credit Allocation',
+    body: `If you have placed an order and the payment is captured but Credits have not yet been allocated to your account due to a technical error on our side, you may request a cancellation within 24 hours of the transaction by contacting our support team. We will review the request and, if confirmed, cancel the order and initiate a full refund.`,
   },
   {
-    title: '3. Damaged or Defective Items',
-    body: `In case of receipt of damaged or defective items please report the same to our Customer Service team. The request will, however, be entertained once the merchant has checked and determined the same at his own end. This should be reported within the same day of receipt of the products.`,
+    title: '3. Non-Refundable Credits',
+    body: `Once Credits are successfully allocated to your VaartaBot account, they are non-refundable. This applies regardless of whether the Credits have been partially or fully consumed. Credits do not expire and remain available in your account for future use.`,
   },
   {
-    title: '4. Product Not as Described',
-    body: `In case you feel that the product received is not as shown on the site or as per your expectations, you must bring it to the notice of our customer service within the same day of receiving the product. The Customer Service Team after looking into your complaint will take an appropriate decision.`,
+    title: '4. Service Unavailability',
+    body: `If VaartaBot experiences a platform outage lasting more than 24 continuous hours that prevents you from using your allocated Credits, you may be eligible for a pro-rata credit extension or partial refund at our discretion. Such claims must be raised within 7 days of the incident by writing to support@vaartabot.in with your account details and order reference.`,
   },
   {
-    title: '5. Warranty Issues',
-    body: `In case of complaints regarding products that come with a warranty from manufacturers, please refer the issue to them.`,
+    title: '5. Duplicate or Erroneous Transactions',
+    body: `If you are charged more than once for the same order, or if a technical error results in an incorrect charge, please contact us immediately at support@vaartabot.in. We will investigate and, if a duplicate or erroneous charge is confirmed, process a full refund for the extra amount within 6–8 business days.`,
   },
   {
     title: '6. Refund Processing',
-    body: `In case of any refunds approved by NACHIKETH M DESAI, it will take 6–8 business days for the refund to be processed to the end customer.`,
+    body: `All approved refunds are processed back to the original payment method used at the time of purchase. Refunds typically reflect within 6–8 business days, depending on your bank or card issuer. VaartaBot is not responsible for delays caused by your financial institution.`,
+  },
+  {
+    title: '7. How to Raise a Refund Request',
+    body: `To raise a refund or cancellation request, email support@vaartabot.in with the subject line "Refund Request — [Order ID]" and include your registered email address, the transaction date, and the reason for your request. Our team will acknowledge your request within 2 business days and provide a resolution within 7 business days.`,
   },
 ];
 
@@ -67,7 +71,7 @@ const Refund: React.FC = () => (
           <h1 className="text-4xl font-bold text-foreground mb-3">Cancellation &amp; Refund Policy</h1>
           <p className="text-muted-foreground text-sm">Last updated on: {LAST_UPDATED}</p>
           <p className="text-muted-foreground mt-4 leading-relaxed max-w-2xl">
-            NACHIKETH M DESAI believes in helping its customers as far as possible, and has therefore a liberal cancellation policy. The following terms apply to all cancellation and refund requests.
+            VaartaBot sells prepaid digital messaging credits. The following policy applies to all purchases made on the VaartaBot platform. Please read it carefully before completing any transaction.
           </p>
         </div>
 
@@ -93,9 +97,9 @@ const Refund: React.FC = () => (
           transition={{ duration: 0.4, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="mt-12 bg-[hsl(var(--tenant-accent)/0.08)] border border-[hsl(var(--tenant-accent)/0.25)] rounded-2xl p-6"
         >
-          <p className="text-sm font-semibold text-foreground mb-1">Refund timeline</p>
+          <p className="text-sm font-semibold text-foreground mb-1">Key points</p>
           <p className="text-sm text-muted-foreground">
-            Approved refunds are processed within <span className="text-foreground font-semibold">6–8 business days</span> back to your original payment method.
+            Credits are <span className="text-foreground font-semibold">non-refundable once allocated</span>. Approved refunds for duplicate/erroneous charges are processed within <span className="text-foreground font-semibold">6–8 business days</span> to your original payment method.
           </p>
         </motion.div>
 

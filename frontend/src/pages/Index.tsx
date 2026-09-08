@@ -13,9 +13,9 @@ import { Button } from '@/components/ui/button';
 
 const BRAND = {
   name:    'VaartaBot',
-  tagline: 'WhatsApp Automation Platform',
+  tagline: 'Business CRM & Communication Platform',
   hero:    'Automate conversations. Convert leads. Grow faster.',
-  sub:     'Send bulk campaigns, manage leads, and run WhatsApp auto-replies — all from one platform. Built for every business, every industry.',
+  sub:     'Send bulk campaigns, manage leads, and run automated messaging — all from one platform. Built for every business, every industry.',
   trust:   'Trusted by growing businesses across India',
 };
 
@@ -36,7 +36,7 @@ const FEATURES = [
   {
     icon:  Send,
     title: 'Bulk Campaigns',
-    desc:  'Blast personalised WhatsApp messages to thousands of opted-in contacts in seconds. Schedule ahead, use approved templates, and track every delivery.',
+    desc:  'Blast personalised messages to thousands of opted-in contacts in seconds. Schedule ahead, use approved templates, and track every delivery.',
   },
   {
     icon:  Repeat2,
@@ -46,12 +46,12 @@ const FEATURES = [
   {
     icon:  Users,
     title: 'Lead CRM',
-    desc:  'Every inbound WhatsApp message becomes a tracked lead. Assign, segment, follow up, and close — all inside your VaartaBot dashboard.',
+    desc:  'Every inbound message becomes a tracked lead. Assign, segment, follow up, and close — all inside your VaartaBot dashboard.',
   },
   {
     icon:  Calendar,
     title: 'Appointment Scheduling',
-    desc:  'Let customers book slots directly on WhatsApp. Automated confirmations, reminders, and rescheduling keep your calendar full.',
+    desc:  'Let customers book slots directly through your platform. Automated confirmations, reminders, and rescheduling keep your calendar full.',
   },
   {
     icon:  BarChart3,
@@ -73,8 +73,8 @@ const STEPS = [
   },
   {
     n:     '02',
-    title: 'Connect WhatsApp',
-    desc:  'Paste your WhatsApp Business API credentials. We verify and sync your approved templates automatically.',
+    title: 'Connect your channel',
+    desc:  'Enter your messaging API credentials. We verify and sync your approved templates automatically.',
   },
   {
     n:     '03',
@@ -182,7 +182,7 @@ const PRICING = [
 
 const TESTIMONIALS = [
   {
-    quote:    '"We automated 80% of our patient follow-ups on WhatsApp. Appointment no-shows dropped by half within the first week."',
+    quote:    '"We automated 80% of our patient follow-ups via messaging. Appointment no-shows dropped by half within the first week."',
     name:     'Dr. Rajesh Kumar',
     role:     'Pharmatrix Clinic, Mumbai',
     rating:   5,
@@ -196,7 +196,7 @@ const TESTIMONIALS = [
     initials: 'SM',
   },
   {
-    quote:    '"Setup took 10 minutes. By end of day one we had 40 new leads from a single WhatsApp broadcast."',
+    quote:    '"Setup took 10 minutes. By end of day one we had 40 new leads from a single broadcast campaign."',
     name:     'Priya Anand',
     role:     'VS Diet Concept, Bangalore',
     rating:   5,
@@ -315,7 +315,7 @@ const Index: React.FC = () => {
               >
                 <div className="inline-flex items-center gap-2 bg-[hsl(var(--tenant-accent)/0.12)] text-[hsl(var(--tenant-accent))] text-xs font-semibold px-3 py-1 rounded-full mb-6 uppercase tracking-wider">
                   <span className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--tenant-accent))]" />
-                  WhatsApp Business API
+                  Business CRM Platform
                 </div>
 
                 <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-[1.1] mb-5">
@@ -428,7 +428,7 @@ const Index: React.FC = () => {
             <p className="text-xs font-semibold text-[hsl(var(--tenant-accent))] uppercase tracking-widest mb-3">Features</p>
             <h2 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground mb-4">Everything your team needs</h2>
             <p className="text-muted-foreground text-lg max-w-xl leading-relaxed">
-              From your first bulk campaign to a fully automated chatbot — VaartaBot gives you one workspace to build, send, and measure every WhatsApp interaction.
+              From your first bulk campaign to a fully automated chatbot — VaartaBot gives you one workspace to build, send, and measure every customer interaction.
             </p>
           </RevealSection>
 
@@ -577,14 +577,9 @@ const Index: React.FC = () => {
             ))}
           </div>
 
-          {/* Meta pricing note */}
           <RevealSection delay={0.3} className="mt-8">
             <p className="text-center text-xs text-muted-foreground">
-              Meta India rates (Jan 2026) —{' '}
-              <span className="text-foreground font-medium">Marketing ₹1.09</span> ·{' '}
-              <span className="text-foreground font-medium">Utility ₹0.145</span> ·{' '}
-              <span className="text-foreground font-medium">Service Free</span>
-              {' '}· 1 credit = 1 message delivered
+              1 credit = 1 message delivered &nbsp;·&nbsp; Credits never expire &nbsp;·&nbsp; No subscription required
             </p>
           </RevealSection>
         </div>
@@ -605,7 +600,7 @@ const Index: React.FC = () => {
                   Your first campaign is waiting.
                 </h2>
                 <p className="text-sidebar-muted text-lg mb-8 max-w-lg mx-auto leading-relaxed">
-                  Join hundreds of businesses automating their WhatsApp outreach with VaartaBot — free to start, no credit card needed.
+                  Join hundreds of businesses automating their customer outreach with VaartaBot — free to start, no credit card needed.
                 </p>
                 <div className="flex flex-wrap gap-3 justify-center">
                   <Link to="/register">

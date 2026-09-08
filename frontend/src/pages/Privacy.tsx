@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MessageSquare, ArrowLeft } from 'lucide-react';
 
-const LAST_UPDATED = 'April 17, 2026';
+const LAST_UPDATED = 'September 8, 2026';
 
 const SECTIONS = [
   {
@@ -20,11 +20,11 @@ const SECTIONS = [
   },
   {
     title: '4. Contact Data You Upload',
-    body: `When you upload contact lists or send messages through VaartaBot, you represent that you have obtained valid consent from those individuals to receive WhatsApp communications. We act as a data processor on your behalf for this data. We do not use your contacts' information for our own marketing purposes.`,
+    body: `When you upload contact lists or send messages through VaartaBot, you represent that you have obtained valid consent from those individuals to receive communications. We act as a data processor on your behalf for this data. We do not use your contacts' information for our own marketing purposes.`,
   },
   {
     title: '5. Data Sharing',
-    body: `We do not sell your personal data. We may share data with: (a) Meta Platforms, as required to facilitate WhatsApp Business API message delivery; (b) payment processors (e.g., Razorpay) to handle transactions securely; (c) cloud infrastructure providers (e.g., AWS, GCP) who host our systems under data processing agreements; and (d) legal authorities when required by law.`,
+    body: `We do not sell your personal data. We may share data with: (a) messaging platform providers, as required to facilitate message delivery on your behalf; (b) payment processors (e.g., Cashfree) to handle transactions securely; (c) cloud infrastructure providers (e.g., AWS) who host our systems under data processing agreements; and (d) legal authorities when required by law.`,
   },
   {
     title: '6. Cookies & Tracking',
