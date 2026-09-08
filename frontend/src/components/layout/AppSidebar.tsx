@@ -3,198 +3,223 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard,
-  Megaphone,
-  MessageSquare,
-  Users,
-  Calendar,
-  BarChart3,
-  CreditCard,
-  Settings,
-  LogOut,
-  X,
-  ChevronRight,
-  Zap,
-  Terminal,
-  BookUser,
-  Inbox,
-  GitBranch,
-  Workflow,
-  UserCog,
+  LayoutDashboard, Megaphone, MessageSquare, Users,
+  Calendar, BarChart3, CreditCard, Settings, LogOut,
+  X, ChevronRight, Terminal, BookUser, Inbox,
+  GitBranch, Workflow, UserCog, HelpCircle,
 } from 'lucide-react';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 interface AppSidebarProps {
-  onClose: () => void;
+  onClose:    () => void;
+  onShowGuide?: () => void;
 }
 
 interface NavItem {
   name:   string;
   href:   string;
   icon:   React.ElementType;
-  roles?: string[];  // if set, only visible to these roles
+  roles?: string[];
+  group?: string;
 }
 
 const NAVIGATION: NavItem[] = [
-  { name: 'Dashboard',       href: '/dashboard',     icon: LayoutDashboard },
-  { name: 'Campaigns',       href: '/campaigns',     icon: Megaphone },
-  { name: 'Bulk Messaging',  href: '/messaging',     icon: MessageSquare },
-  { name: 'Inbox',           href: '/inbox',         icon: Inbox },
-  { name: 'Contacts',        href: '/contacts',      icon: BookUser },
-  { name: 'Drip Sequences',  href: '/drip',          icon: GitBranch },
-  { name: 'Leads',           href: '/leads',         icon: Users },
-  { name: 'Appointments',    href: '/appointments',  icon: Calendar },
-  { name: 'Flow Builder',    href: '/flow-builder',  icon: Workflow },
-  { name: 'Reports',         href: '/reports',       icon: BarChart3 },
-  { name: 'Team',            href: '/staff',         icon: UserCog,  roles: ['admin'] },
-  { name: 'Billing',         href: '/billing',       icon: CreditCard, roles: ['admin'] },
-  { name: 'Settings',        href: '/settings',      icon: Settings, roles: ['admin'] },
-  { name: 'API Reference',   href: '/api-docs',      icon: Terminal, roles: ['admin'] },
+  { name: 'Dashboard',       href: '/dashboard',    icon: LayoutDashboard, group: 'core' },
+  { name: 'Inbox',           href: '/inbox',         icon: Inbox,           group: 'core' },
+  { name: 'Contacts',        href: '/contacts',      icon: BookUser,        group: 'core' },
+
+  { name: 'Campaigns',       href: '/campaigns',     icon: Megaphone,       group: 'marketing' },
+  { name: 'Bulk Messaging',  href: '/messaging',     icon: MessageSquare,   group: 'marketing' },
+  { name: 'Drip Sequences',  href: '/drip',          icon: GitBranch,       group: 'marketing' },
+
+  { name: 'Leads',           href: '/leads',         icon: Users,           group: 'crm' },
+  { name: 'Appointments',    href: '/appointments',  icon: Calendar,        group: 'crm' },
+
+  { name: 'Flow Builder',    href: '/flow-builder',  icon: Workflow,        group: 'automation' },
+  { name: 'Reports',         href: '/reports',       icon: BarChart3,       group: 'automation' },
+
+  { name: 'Team',            href: '/staff',         icon: UserCog,         group: 'admin', roles: ['admin'] },
+  { name: 'Billing',         href: '/billing',       icon: CreditCard,      group: 'admin', roles: ['admin'] },
+  { name: 'Settings',        href: '/settings',      icon: Settings,        group: 'admin', roles: ['admin'] },
+  { name: 'API Reference',   href: '/api-docs',      icon: Terminal,        group: 'admin', roles: ['admin'] },
 ];
 
-const AppSidebar: React.FC<AppSidebarProps> = ({ onClose }) => {
-  const { tenant } = useTenant();
-  const { logout, user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+const GROUP_LABELS: Record<string, string> = {
+  core: 'Workspace',
+  marketing: 'Marketing',
+  crm: 'CRM',
+  automation: 'Automation',
+  admin: 'Admin',
+};
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+const AppSidebar: React.FC<AppSidebarProps> = ({ onClose, onShowGuide }) => {
+  const { tenant }          = useTenant();
+  const { logout, user }    = useAuth();
+  const location            = useLocation();
+  const navigate            = useNavigate();
+
+  const handleLogout = () => { logout(); navigate('/login'); };
+
+  const visible = NAVIGATION.filter(
+    item => !item.roles || item.roles.includes(user?.role || 'admin')
+  );
+
+  const groups = [...new Set(visible.map(i => i.group!))];
 
   return (
-    // ── Outer shell ──────────────────────────────────────────────────────────
-    // fixed + inset-y-0 + left-0 makes the sidebar stick to the left edge
-    // of the viewport at all times, completely independent of page scroll.
-    // On mobile it overlays the content; on lg+ it sits alongside it.
-    // The parent layout must add lg:pl-[280px] to the main content wrapper
-    // so content isn't hidden behind the sidebar.
     <div className={cn(
       'fixed inset-y-0 left-0 z-40',
-      'w-[280px] bg-sidebar',
-      'flex flex-col',
-      'border-r border-sidebar-border shadow-sidebar',
-    )}>
+      'w-[272px] flex flex-col',
+      'border-r border-sidebar-border',
+    )} style={{ background: 'hsl(var(--sidebar-background))' }}>
 
-      {/* ── Brand header ─────────────────────────────────────────────────── */}
-      <div className="shrink-0 p-5 border-b border-sidebar-border">
+      {/* ── Brand header ──────────────────────────────────── */}
+      <div className="shrink-0 px-5 py-4 border-b border-sidebar-border">
         <div className="flex items-center justify-between">
-
-          {/* Logo + tenant name */}
           <div className="flex items-center gap-3 min-w-0">
-            {/* Tenant logo if set, otherwise VaartaBot default icon */}
+            {/* Logo mark */}
             {tenant?.logo ? (
-              <img
-                src={tenant.logo}
-                alt={tenant.name}
-                className="w-10 h-10 rounded-xl object-cover shrink-0"
-              />
+              <img src={tenant.logo} alt={tenant.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-tenant-accent flex items-center justify-center shrink-0 shadow-sm">
-                <Zap className="w-5 h-5 text-white" />
+              <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center"
+                   style={{ background: 'linear-gradient(135deg, hsl(220 73% 55%), hsl(var(--tenant-accent)))' }}>
+                {/* VaartaBot wordmark icon — a speech bubble with a bot dot */}
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10 2C5.58 2 2 5.13 2 9C2 11.38 3.19 13.47 5.07 14.84L4 18L7.5 16.46C8.3 16.72 9.13 16.86 10 16.86C14.42 16.86 18 13.73 18 9.86C18 5.99 14.42 2 10 2Z"
+                        fill="white" fillOpacity="0.9"/>
+                  <circle cx="7" cy="9" r="1.2" fill="hsl(220 73% 49%)"/>
+                  <circle cx="10" cy="9" r="1.2" fill="hsl(220 73% 49%)"/>
+                  <circle cx="13" cy="9" r="1.2" fill="hsl(220 73% 49%)"/>
+                </svg>
               </div>
             )}
 
             <div className="min-w-0">
-              <h2 className="font-semibold text-sidebar-foreground truncate text-sm leading-tight">
+              <h2 className="font-bold text-sidebar-foreground truncate leading-tight"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '15px', letterSpacing: '-0.02em' }}>
                 {tenant?.name || 'VaartaBot'}
               </h2>
-              <p className="text-xs text-sidebar-muted truncate mt-0.5">
-                {tenant?.industry || 'WhatsApp Automation'}
+              <p className="text-[11px] truncate mt-0.5" style={{ color: 'hsl(220 20% 55%)' }}>
+                by Milarch Tech
               </p>
             </div>
           </div>
 
-          {/* Close button — mobile only */}
           <button
             onClick={onClose}
-            className="lg:hidden shrink-0 p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-muted hover:text-sidebar-foreground transition-colors"
-            aria-label="Close sidebar"
+            className="lg:hidden shrink-0 p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-muted hover:text-sidebar-foreground transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* ── Navigation ───────────────────────────────────────────────────── */}
-      {/* overflow-y-auto here: if nav items overflow (many items / small screen)
-          only the nav list scrolls, not the entire sidebar. Header & footer
-          remain always visible. */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {NAVIGATION.filter(item => !item.roles || item.roles.includes(user?.role || 'admin')).map((item, index) => {
-          const isActive =
-            location.pathname === item.href ||
-            (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
-
+      {/* ── Navigation ────────────────────────────────────── */}
+      <nav className="flex-1 overflow-y-auto py-3 custom-scrollbar">
+        {groups.map((group, gi) => {
+          const items = visible.filter(i => i.group === group);
           return (
-            <motion.div
-              key={item.name}
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.04, duration: 0.3 }}
-            >
-              <NavLink
-                to={item.href}
-                onClick={onClose}
-                className={cn(
-                  // Base styles
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
-                  // Inactive
-                  'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/60',
-                  // Active
-                  isActive && 'bg-sidebar-accent text-sidebar-foreground shadow-sm',
-                )}
-              >
-                <item.icon className={cn(
-                  'w-[18px] h-[18px] shrink-0 transition-colors',
-                  isActive
-                    ? 'text-tenant-accent'
-                    : 'text-sidebar-muted group-hover:text-sidebar-foreground'
-                )} />
+            <div key={group} className={cn('px-3', gi > 0 && 'mt-4')}>
+              <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                 style={{ color: 'hsl(220 20% 40%)' }}>
+                {GROUP_LABELS[group]}
+              </p>
+              <div className="space-y-0.5">
+                {items.map((item, index) => {
+                  const isActive =
+                    location.pathname === item.href ||
+                    (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
 
-                <span className="flex-1 truncate">{item.name}</span>
-
-                {isActive && (
-                  <ChevronRight className="w-3.5 h-3.5 text-tenant-accent shrink-0" />
-                )}
-              </NavLink>
-            </motion.div>
+                  return (
+                    <motion.div
+                      key={item.name}
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: (gi * 4 + index) * 0.03, duration: 0.25 }}
+                    >
+                      <NavLink
+                        to={item.href}
+                        onClick={onClose}
+                        className={cn(
+                          'group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150',
+                          isActive
+                            ? 'bg-sidebar-accent text-sidebar-foreground'
+                            : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
+                        )}
+                      >
+                        <item.icon className={cn(
+                          'w-4 h-4 shrink-0 transition-colors',
+                          isActive ? 'text-sidebar-primary' : 'text-sidebar-muted group-hover:text-sidebar-foreground/70'
+                        )} />
+                        <span className="flex-1 truncate">{item.name}</span>
+                        {isActive && <ChevronRight className="w-3 h-3 text-sidebar-primary shrink-0" />}
+                      </NavLink>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
 
-      {/* ── User / logout footer ──────────────────────────────────────────── */}
-      {/* shrink-0 prevents this from being squished when nav overflows */}
-      <div className="shrink-0 p-3 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-sidebar-accent/40">
+      {/* ── Footer ────────────────────────────────────────── */}
+      <div className="shrink-0 border-t border-sidebar-border">
 
-          {/* Avatar */}
-          <div className="w-8 h-8 rounded-full bg-tenant-accent flex items-center justify-center text-xs font-semibold text-white shrink-0 shadow-sm">
-            {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
+        {/* Getting Started button */}
+        {onShowGuide && (
+          <div className="px-3 pt-3">
+            <button
+              onClick={onShowGuide}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
+              style={{ color: 'hsl(var(--sidebar-primary))', background: 'hsl(220 73% 62% / 0.12)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'hsl(220 73% 62% / 0.2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'hsl(220 73% 62% / 0.12)')}
+            >
+              <HelpCircle className="w-4 h-4 shrink-0" />
+              Getting started guide
+            </button>
+          </div>
+        )}
+
+        {/* User row */}
+        <div className="p-3">
+          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg"
+               style={{ background: 'hsl(220 53% 12%)' }}>
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                 style={{ background: 'linear-gradient(135deg, hsl(220 73% 55%), hsl(var(--tenant-accent)))' }}>
+              {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-medium text-sidebar-foreground truncate leading-tight">
+                {user?.name || 'User'}
+              </p>
+              <p className="text-[11px] truncate capitalize mt-0.5" style={{ color: 'hsl(220 20% 50%)' }}>
+                {user?.role || 'Admin'}
+              </p>
+            </div>
+            <button onClick={handleLogout} title="Sign out"
+              className="shrink-0 p-1.5 rounded-lg transition-colors"
+              style={{ color: 'hsl(220 20% 45%)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#f87171'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'hsl(220 20% 45%)'; }}>
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          {/* Name + role */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
-              {user?.name || 'User'}
-            </p>
-            <p className="text-xs text-sidebar-muted truncate capitalize mt-0.5">
-              {user?.role || 'Admin'}
-            </p>
+          {/* Milarch Tech attribution */}
+          <div className="mt-2 px-3 flex items-center gap-1.5">
+            {/* Milarch "M" logomark */}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="16" height="16" rx="3" fill="hsl(220 73% 49%)"/>
+              <path d="M3 12V4L6.5 9L8 6.5L9.5 9L13 4V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '11px', fontWeight: 600, color: 'hsl(220 20% 40%)', letterSpacing: '-0.01em' }}>
+              Milarch Tech
+            </span>
           </div>
-
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="shrink-0 p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-muted hover:text-red-400 transition-colors"
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </div>
