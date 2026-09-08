@@ -16,18 +16,19 @@
     --popover:              0 0% 100%;
     --popover-foreground:   220 45% 10%;
 
-    /* ── Brand ───────────────────────────────────────────── */
-    /* Cobalt blue — electric, confident, not Inter-blue */
-    --primary:              220 73% 49%;
+    /* ── Brand — Milarch Tech indigo ─────────────────────── */
+    /* Pulled from the MILARCH wordmark: #4A3694 → hsl(256 44% 39%) */
+    /* Lightened slightly for use on white: hsl(256 48% 48%)         */
+    --primary:              256 48% 48%;
     --primary-foreground:   0 0% 100%;
 
-    --secondary:            220 20% 94%;
-    --secondary-foreground: 220 45% 10%;
+    --secondary:            252 18% 94%;
+    --secondary-foreground: 252 45% 10%;
 
-    --muted:                220 20% 94%;
-    --muted-foreground:     220 12% 48%;
+    --muted:                252 18% 94%;
+    --muted-foreground:     252 12% 48%;
 
-    --accent:               220 73% 49%;
+    --accent:               256 48% 48%;
     --accent-foreground:    0 0% 100%;
 
     /* ── Semantic ─────────────────────────────────────────── */
@@ -41,46 +42,49 @@
     --warning-foreground:   0 0% 100%;
 
     /* ── Chrome ───────────────────────────────────────────── */
-    --border:               220 20% 90%;
-    --input:                220 20% 90%;
-    --ring:                 220 73% 49%;
+    --border:               252 16% 88%;
+    --input:                252 16% 88%;
+    --ring:                 256 48% 48%;
     --radius:               0.75rem;
 
-    /* ── Sidebar — deep midnight ──────────────────────────── */
-    --sidebar-background:   220 53% 8%;
-    --sidebar-foreground:   210 40% 97%;
-    --sidebar-primary:      220 73% 62%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent:       220 53% 14%;
-    --sidebar-accent-foreground: 210 40% 97%;
-    --sidebar-border:       220 53% 13%;
-    --sidebar-ring:         220 73% 62%;
-    --sidebar-muted:        220 20% 58%;
+    /* ── Sidebar — deep indigo-midnight ──────────────────── */
+    /* Milarch M bottom gradient is deep indigo #3B2A85 → hsl(252 52% 35%) */
+    --sidebar-background:   252 45% 7%;
+    --sidebar-foreground:   240 30% 97%;
+    --sidebar-primary:      178 55% 52%;   /* Milarch teal — top of M */
+    --sidebar-primary-foreground: 252 45% 7%;
+    --sidebar-accent:       252 45% 13%;
+    --sidebar-accent-foreground: 240 30% 97%;
+    --sidebar-border:       252 45% 12%;
+    --sidebar-ring:         178 55% 52%;
+    --sidebar-muted:        252 20% 52%;
 
     /* ── Chart ────────────────────────────────────────────── */
-    --chart-1: 220 73% 49%;
-    --chart-2: 142 71% 40%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 262 83% 58%;
-    --chart-5: 340 82% 56%;
+    --chart-1: 256 48% 48%;   /* Milarch indigo  */
+    --chart-2: 178 50% 44%;   /* Milarch teal    */
+    --chart-3: 38 88% 52%;    /* amber           */
+    --chart-4: 340 75% 54%;   /* rose            */
+    --chart-5: 210 80% 54%;   /* sky blue        */
 
-    /* ── Tenant accent (default = emerald) ───────────────── */
-    --tenant-accent:         142 71% 40%;
-    --tenant-accent-light:   142 71% 95%;
+    /* ── Tenant accent (default = Milarch teal, muted) ───── */
+    /* Logo top gradient: #2EC4C0 → hsl(178 61% 47%)         */
+    /* Pulled back to 178 50% 44% — present but not garish   */
+    --tenant-accent:         178 50% 44%;
+    --tenant-accent-light:   178 50% 94%;
     --tenant-accent-foreground: 0 0% 100%;
   }
 
   /* Per-tenant palette overrides */
-  [data-tenant="company1"]  { --tenant-accent: 220 73% 49%; --tenant-accent-light: 220 73% 95%; }
-  [data-tenant="company2"]  { --tenant-accent: 142 71% 40%; --tenant-accent-light: 142 71% 95%; }
-  [data-tenant="company3"]  { --tenant-accent: 25 95% 53%;  --tenant-accent-light: 25 95% 95%; }
-  [data-tenant="company4"]  { --tenant-accent: 262 83% 58%; --tenant-accent-light: 262 83% 95%; }
-  [data-tenant="company5"]  { --tenant-accent: 340 82% 56%; --tenant-accent-light: 340 82% 95%; }
-  [data-tenant="company6"]  { --tenant-accent: 38 92% 50%;  --tenant-accent-light: 38 92% 95%; }
-  [data-tenant="company7"]  { --tenant-accent: 192 91% 36%; --tenant-accent-light: 192 91% 95%; }
-  [data-tenant="company8"]  { --tenant-accent: 262 83% 58%; --tenant-accent-light: 262 83% 95%; }
-  [data-tenant="company9"]  { --tenant-accent: 84 85% 42%;  --tenant-accent-light: 84 85% 95%; }
-  [data-tenant="company10"] { --tenant-accent: 220 73% 49%; --tenant-accent-light: 220 73% 95%; }
+  [data-tenant="company1"]  { --tenant-accent: 256 48% 48%; --tenant-accent-light: 256 48% 95%; }
+  [data-tenant="company2"]  { --tenant-accent: 178 50% 44%; --tenant-accent-light: 178 50% 94%; }
+  [data-tenant="company3"]  { --tenant-accent: 25 88% 52%;  --tenant-accent-light: 25 88% 95%; }
+  [data-tenant="company4"]  { --tenant-accent: 256 58% 58%; --tenant-accent-light: 256 58% 95%; }
+  [data-tenant="company5"]  { --tenant-accent: 340 72% 52%; --tenant-accent-light: 340 72% 95%; }
+  [data-tenant="company6"]  { --tenant-accent: 38 88% 50%;  --tenant-accent-light: 38 88% 95%; }
+  [data-tenant="company7"]  { --tenant-accent: 192 75% 38%; --tenant-accent-light: 192 75% 95%; }
+  [data-tenant="company8"]  { --tenant-accent: 256 58% 58%; --tenant-accent-light: 256 58% 95%; }
+  [data-tenant="company9"]  { --tenant-accent: 166 52% 40%; --tenant-accent-light: 166 52% 94%; }
+  [data-tenant="company10"] { --tenant-accent: 210 72% 50%; --tenant-accent-light: 210 72% 95%; }
 
   .dark {
     --background:           220 47% 5%;
@@ -92,26 +96,26 @@
     --popover:              220 47% 8%;
     --popover-foreground:   210 40% 98%;
 
-    --primary:              220 73% 62%;
-    --primary-foreground:   220 47% 10%;
+    --primary:              256 55% 65%;
+    --primary-foreground:   252 45% 7%;
 
-    --secondary:            220 47% 15%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary:            252 45% 14%;
+    --secondary-foreground: 240 30% 97%;
 
-    --muted:                220 47% 15%;
-    --muted-foreground:     220 12% 60%;
+    --muted:                252 45% 14%;
+    --muted-foreground:     252 20% 58%;
 
-    --accent:               220 73% 62%;
-    --accent-foreground:    220 47% 10%;
+    --accent:               256 55% 65%;
+    --accent-foreground:    252 45% 7%;
 
     --destructive:          3 62% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border:               220 47% 18%;
-    --input:                220 47% 18%;
-    --ring:                 220 73% 62%;
+    --border:               252 45% 18%;
+    --input:                252 45% 18%;
+    --ring:                 256 55% 65%;
 
-    --tenant-accent-light:  142 71% 10%;
+    --tenant-accent-light:  178 50% 10%;
   }
 }
 

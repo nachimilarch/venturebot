@@ -83,15 +83,20 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ onClose, onShowGuide }) => {
             {tenant?.logo ? (
               <img src={tenant.logo} alt={tenant.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
             ) : (
-              <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center"
-                   style={{ background: 'linear-gradient(135deg, hsl(220 73% 55%), hsl(var(--tenant-accent)))' }}>
-                {/* VaartaBot wordmark icon — a speech bubble with a bot dot */}
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10 2C5.58 2 2 5.13 2 9C2 11.38 3.19 13.47 5.07 14.84L4 18L7.5 16.46C8.3 16.72 9.13 16.86 10 16.86C14.42 16.86 18 13.73 18 9.86C18 5.99 14.42 2 10 2Z"
-                        fill="white" fillOpacity="0.9"/>
-                  <circle cx="7" cy="9" r="1.2" fill="hsl(220 73% 49%)"/>
-                  <circle cx="10" cy="9" r="1.2" fill="hsl(220 73% 49%)"/>
-                  <circle cx="13" cy="9" r="1.2" fill="hsl(220 73% 49%)"/>
+              <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center bg-white/10">
+                {/* VaartaBot chat bubble mark */}
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 2C6.03 2 2 5.58 2 10C2 12.62 3.38 14.95 5.55 16.45L4.5 20L8.5 18.2C9.3 18.42 10.14 18.55 11 18.55C15.97 18.55 20 14.97 20 10.28C20 5.58 15.97 2 11 2Z"
+                        fill="url(#vbGrad)"/>
+                  <circle cx="7.5" cy="10" r="1.3" fill="white" fillOpacity="0.9"/>
+                  <circle cx="11" cy="10" r="1.3" fill="white" fillOpacity="0.9"/>
+                  <circle cx="14.5" cy="10" r="1.3" fill="white" fillOpacity="0.9"/>
+                  <defs>
+                    <linearGradient id="vbGrad" x1="2" y1="2" x2="20" y2="20" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#2EC4C0"/>
+                      <stop offset="100%" stopColor="#4A3694"/>
+                    </linearGradient>
+                  </defs>
                 </svg>
               </div>
             )}
@@ -209,16 +214,22 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ onClose, onShowGuide }) => {
             </button>
           </div>
 
-          {/* Milarch Tech attribution */}
-          <div className="mt-2 px-3 flex items-center gap-1.5">
-            {/* Milarch "M" logomark */}
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="16" height="16" rx="3" fill="hsl(220 73% 49%)"/>
-              <path d="M3 12V4L6.5 9L8 6.5L9.5 9L13 4V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '11px', fontWeight: 600, color: 'hsl(220 20% 40%)', letterSpacing: '-0.01em' }}>
-              Milarch Tech
-            </span>
+          {/* Milarch Tech attribution — real logo */}
+          <div className="mt-2 px-3">
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
+                 style={{ background: 'hsl(252 45% 12%)' }}>
+              <div className="w-6 h-6 rounded bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                <img src="/milarch-logo.png" alt="Milarch Tech" className="w-5 h-5 object-contain" />
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '10px', fontWeight: 700, color: 'hsl(252 20% 65%)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Powered by
+                </p>
+                <p style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '11px', fontWeight: 700, color: 'hsl(178 55% 55%)', letterSpacing: '-0.01em', lineHeight: '1' }}>
+                  Milarch Tech
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -165,11 +165,10 @@ export default function OnboardingWizard({ open, onClose }: OnboardingWizardProp
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                 <div className="flex items-center gap-2.5">
-                  {/* Milarch logomark */}
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="16" height="16" rx="3" fill="hsl(220 73% 49%)"/>
-                    <path d="M3 12V4L6.5 9L8 6.5L9.5 9L13 4V12" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  {/* Milarch real logo */}
+                  <div className="w-6 h-6 rounded bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                    <img src="/milarch-logo.png" alt="Milarch Tech" className="w-5 h-5 object-contain" />
+                  </div>
                   <span style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '14px', fontWeight: 700, letterSpacing: '-0.02em' }}>
                     Getting Started
                   </span>

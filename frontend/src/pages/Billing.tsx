@@ -6,7 +6,7 @@ import {
   Wallet, ArrowUpRight, ArrowDownRight,
   Crown, Sparkles, MessageSquare, RefreshCw,
   Search, Filter, X, CheckCircle,
-  Zap, Gift, CreditCard, ShieldCheck, Lock,
+  Zap, Gift, CreditCard, ShieldCheck, Lock, Bot,
 } from 'lucide-react';
 import { useTenant } from '@/contexts/TenantContext';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,23 @@ const loadCashfreeSDK = (): Promise<void> =>
     document.head.appendChild(script);
   });
 
+interface AiTokenUsage {
+  balance: number;
+  session: { tokens: number };
+  thisMonth: { calls: number; tokens: number };
+  allTime: { calls: number; tokens: number };
+  byFeature: { feature: string; calls: number; inputTokens: number; outputTokens: number; totalTokens: number }[];
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  'suggest-reply':     'Reply suggestions',
+  'draft-campaign':    'Campaign drafts',
+  'build-flow':        'Flow builder',
+  'suggest-drip':      'Drip sequences',
+  'contact-summary':   'Contact summaries',
+  'campaign-insights': 'Campaign insights',
+};
+
 const Billing: React.FC = () => {
   const { tenant, transactions, dashboardStats } = useTenant();
 
@@ -52,6 +69,7 @@ const Billing: React.FC = () => {
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
   const [liveTransactions, setLiveTransactions] = useState<any[] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [aiUsage, setAiUsage] = useState<AiTokenUsage | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
@@ -63,12 +81,14 @@ const Billing: React.FC = () => {
   const refreshBilling = async (silent = true) => {
     if (!silent) setIsRefreshing(true);
     try {
-      const [balRes, txRes] = await Promise.all([
+      const [balRes, txRes, aiRes] = await Promise.all([
         api.get('/api/tenant'),
         api.get('/api/payments/history'),
+        api.get('/api/ai/token-usage').catch(() => null),
       ]);
       if (balRes.data?.success) setLiveBalance(balRes.data.data.credits_balance);
       if (txRes.data?.success) setLiveTransactions(txRes.data.data);
+      if (aiRes?.data?.success) setAiUsage(aiRes.data.data);
     } catch (err) {
       console.error('[Billing] refreshBilling failed:', err);
     } finally {
@@ -198,6 +218,7 @@ const Billing: React.FC = () => {
       case 'debit': return <ArrowDownRight className="w-4 h-4 text-yellow-500" />;
       case 'refund': return <ArrowUpRight className="w-4 h-4 text-blue-500" />;
       case 'subscription': return <Crown className="w-4 h-4 text-purple-500" />;
+      case 'ai_usage': return <Bot className="w-4 h-4 text-violet-500" />;
       default: return <Wallet className="w-4 h-4 text-muted-foreground" />;
     }
   };
@@ -412,6 +433,99 @@ const Billing: React.FC = () => {
         ))}
       </motion.div>
 
+      {/* ── AI Token Usage ── */}
+      <motion.div variants={itemVariants}>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-950/40 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">AI Tokens</h2>
+          <span className="text-xs text-muted-foreground bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5 font-medium">
+            Separate from message credits
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {/* Balance */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground mb-1">Token Balance</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums">
+              {(aiUsage?.balance ?? 0).toLocaleString()}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">tokens remaining</p>
+          </div>
+          {/* Session (today) */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground mb-1">Today (session)</p>
+            <p className="text-2xl font-bold text-violet-600 dark:text-violet-400 tabular-nums">
+              {(aiUsage?.session?.tokens ?? 0).toLocaleString()}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">tokens used</p>
+          </div>
+          {/* This month */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground mb-1">This Month</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums">
+              {(aiUsage?.thisMonth?.tokens ?? 0).toLocaleString()}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">{aiUsage?.thisMonth?.calls ?? 0} calls</p>
+          </div>
+          {/* All time */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <p className="text-xs text-muted-foreground mb-1">All Time</p>
+            <p className="text-2xl font-bold text-foreground tabular-nums">
+              {(aiUsage?.allTime?.tokens ?? 0).toLocaleString()}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">{aiUsage?.allTime?.calls ?? 0} total calls</p>
+          </div>
+        </div>
+
+        {/* Per-feature breakdown */}
+        {aiUsage?.byFeature && aiUsage.byFeature.length > 0 && (
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <div className="px-4 py-3 border-b border-border bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">This Month — Feature Breakdown</p>
+            </div>
+            <div className="divide-y divide-border">
+              {aiUsage.byFeature.map(f => {
+                const pct = aiUsage.thisMonth.tokens > 0
+                  ? Math.round((f.totalTokens / aiUsage.thisMonth.tokens) * 100) : 0;
+                return (
+                  <div key={f.feature} className="flex items-center gap-4 px-4 py-3">
+                    <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-950/30 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {FEATURE_LABELS[f.feature] ?? f.feature}
+                        </p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {f.totalTokens.toLocaleString()} tok · {f.calls} call{f.calls !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-violet-500/70 transition-all duration-500"
+                             style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold text-muted-foreground tabular-nums w-8 text-right">{pct}%</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {!aiUsage && (
+          <div className="bg-card rounded-xl border border-dashed border-border p-6 text-center">
+            <Bot className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">No AI usage recorded yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">Use AI features in Inbox, Contacts, or Campaigns to see token usage here.</p>
+          </div>
+        )}
+      </motion.div>
+
       {/* ── Transaction History ── */}
       <motion.div variants={itemVariants}>
         <div className="flex items-center justify-between mb-4">
@@ -441,6 +555,8 @@ const Billing: React.FC = () => {
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="purchase">Purchase</SelectItem>
               <SelectItem value="credit">Credit</SelectItem>
+              <SelectItem value="usage">Usage</SelectItem>
+              <SelectItem value="ai_usage">AI Usage</SelectItem>
               <SelectItem value="debit">Debit</SelectItem>
               <SelectItem value="refund">Refund</SelectItem>
             </SelectContent>
