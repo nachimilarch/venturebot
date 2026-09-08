@@ -76,9 +76,10 @@ router.get('/invoice/:month', async (req, res) => {
     );
 
     const [transactions] = await pool.execute(
-      `SELECT amount, credits_added, payment_method, created_at, order_id
-       FROM transactions
-       WHERE tenant_id = ? AND DATE_FORMAT(created_at, '%Y-%m') = ?
+      `SELECT price AS amount, credits, package_label, created_at
+       FROM credit_requests
+       WHERE tenant_id = ? AND status = 'approved'
+         AND DATE_FORMAT(created_at, '%Y-%m') = ?
        ORDER BY created_at ASC`,
       [tenantId, month]
     );
@@ -89,8 +90,8 @@ router.get('/invoice/:month', async (req, res) => {
       <tr>
         <td>${i + 1}</td>
         <td>${new Date(t.created_at).toLocaleDateString('en-IN')}</td>
-        <td>WhatsApp Credits — ${t.credits_added} credits</td>
-        <td>${t.payment_method || 'Online'}</td>
+        <td>${t.package_label || 'WhatsApp Credits'} — ${t.credits} credits</td>
+        <td>Online</td>
         <td style="text-align:right">₹${parseFloat(t.amount || 0).toFixed(2)}</td>
       </tr>`).join('');
 
