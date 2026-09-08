@@ -21,9 +21,14 @@ import {
   Pause,
   Link2,
   BarChart2,
+  Sparkles,
+  Loader2,
+  Copy,
+  Check as CheckIcon,
 } from 'lucide-react';
 
 import { useTenant } from '@/contexts/TenantContext';
+import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -292,6 +297,14 @@ const Campaigns: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // AI draft state
+  const [aiDraftOpen, setAiDraftOpen] = useState(false);
+  const [aiGoal, setAiGoal] = useState('');
+  const [aiTone, setAiTone] = useState('friendly');
+  const [aiDraftResult, setAiDraftResult] = useState('');
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [aiCopied, setAiCopied] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<number, boolean>>({});
   const [viewCampaign, setViewCampaign] = useState<Campaign | null>(null);
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
@@ -536,6 +549,26 @@ const Campaigns: React.FC = () => {
     }
   };
 
+  const runAiDraft = async () => {
+    if (!aiGoal.trim()) return;
+    setAiDraftLoading(true);
+    setAiDraftResult('');
+    try {
+      const { data } = await api.post('/api/ai/draft-campaign', { goal: aiGoal, tone: aiTone });
+      setAiDraftResult(data.message || '');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'AI unavailable');
+    } finally {
+      setAiDraftLoading(false);
+    }
+  };
+
+  const copyAiDraft = () => {
+    navigator.clipboard.writeText(aiDraftResult);
+    setAiCopied(true);
+    setTimeout(() => setAiCopied(false), 2000);
+  };
+
   const openEditDialog = (campaign: Campaign) => {
     setEditForm({
       name: campaign.name ?? '',
@@ -768,6 +801,15 @@ const Campaigns: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setAiDraftOpen(true); setAiDraftResult(''); setAiGoal(''); }}
+              className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+            >
+              <Sparkles className="mr-1 h-4 w-4" />
+              <span className="hidden text-xs sm:inline">Draft with AI</span>
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -1237,6 +1279,76 @@ const Campaigns: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── AI Draft Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={aiDraftOpen} onOpenChange={setAiDraftOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" /> Draft with AI
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label>What's your campaign goal?</Label>
+              <Textarea
+                placeholder="e.g. Promote 20% off dental cleaning this week to existing patients"
+                rows={2}
+                value={aiGoal}
+                onChange={e => setAiGoal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) runAiDraft(); }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tone</Label>
+              <Select value={aiTone} onValueChange={setAiTone}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="friendly">Friendly</SelectItem>
+                  <SelectItem value="professional">Professional</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="casual">Casual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              onClick={runAiDraft}
+              disabled={aiDraftLoading || !aiGoal.trim()}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {aiDraftLoading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Drafting…</>
+                : <><Sparkles className="w-4 h-4 mr-2" /> Generate Draft</>
+              }
+            </Button>
+
+            {aiDraftResult && (
+              <div className="space-y-2">
+                <Label>Generated message</Label>
+                <div className="relative rounded-lg border bg-muted/40 p-3 text-sm leading-relaxed">
+                  {aiDraftResult}
+                  <button
+                    onClick={copyAiDraft}
+                    className="absolute top-2 right-2 p-1 rounded hover:bg-muted transition-colors"
+                    title="Copy"
+                  >
+                    {aiCopied
+                      ? <CheckIcon className="w-3.5 h-3.5 text-green-500" />
+                      : <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                    }
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Copy this text and use it as a base when creating your Meta template.
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

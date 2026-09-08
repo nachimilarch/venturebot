@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Send, RefreshCw, Phone, ArrowLeft,
-  Ban, Check, CheckCheck, Circle,
+  Ban, Check, CheckCheck, Circle, Sparkles, Loader2,
 } from 'lucide-react';
 import { Button }  from '@/components/ui/button';
 import { Input }   from '@/components/ui/input';
@@ -65,6 +65,8 @@ export default function Inbox() {
 
   const [reply, setReply]           = useState('');
   const [sending, setSending]       = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiLoading, setAiLoading]   = useState(false);
 
   const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
 
@@ -150,6 +152,20 @@ export default function Inbox() {
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); }
+  };
+
+  const suggestReplies = async () => {
+    if (!active) return;
+    setAiLoading(true);
+    setAiSuggestions([]);
+    try {
+      const { data } = await api.post('/api/ai/suggest-reply', { phone: active.phone });
+      setAiSuggestions(data.suggestions || []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'AI unavailable');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   return (
@@ -303,18 +319,56 @@ export default function Inbox() {
                   This contact has opted out — cannot send messages.
                 </div>
               ) : (
-                <div className="flex items-end gap-2">
-                  <Textarea
-                    value={reply}
-                    onChange={e => setReply(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-                    rows={1}
-                    className="resize-none flex-1 min-h-[40px] max-h-32 text-sm"
-                  />
-                  <Button size="sm" onClick={sendReply} disabled={sending || !reply.trim()} className="h-10 px-3">
-                    {sending ? <Circle className="w-4 h-4 animate-pulse" /> : <Send className="w-4 h-4" />}
-                  </Button>
+                <div className="space-y-2">
+                  {/* AI suggestion chips */}
+                  <AnimatePresence>
+                    {(aiSuggestions.length > 0 || aiLoading) && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-wrap gap-1.5"
+                      >
+                        {aiLoading ? (
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground py-1">
+                            <Loader2 className="w-3 h-3 animate-spin" /> AI is thinking…
+                          </span>
+                        ) : aiSuggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { setReply(s); setAiSuggestions([]); }}
+                            className="text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-full px-3 py-1 transition-colors text-left"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="flex items-end gap-2">
+                    <Textarea
+                      value={reply}
+                      onChange={e => setReply(e.target.value)}
+                      onKeyDown={handleKey}
+                      placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+                      rows={1}
+                      className="resize-none flex-1 min-h-[40px] max-h-32 text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={suggestReplies}
+                      disabled={aiLoading}
+                      title="AI suggest replies"
+                      className="h-10 px-3 text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                    >
+                      {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    </Button>
+                    <Button size="sm" onClick={sendReply} disabled={sending || !reply.trim()} className="h-10 px-3">
+                      {sending ? <Circle className="w-4 h-4 animate-pulse" /> : <Send className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground mt-1.5 text-right">
