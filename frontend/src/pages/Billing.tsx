@@ -32,6 +32,13 @@ const creditPackages = [
   { id: 5, credits: 30000, label: 'Enterprise',  icon: Sparkles,  price: 44999 },
 ];
 
+const aiTokenPackages = [
+  { id: 1, tokens: 100_000,    label: 'AI Starter', icon: Zap,      price: 299   },
+  { id: 2, tokens: 500_000,    label: 'AI Basic',   icon: Bot,      price: 999,  popular: true },
+  { id: 3, tokens: 2_000_000,  label: 'AI Growth',  icon: Sparkles, price: 3499  },
+  { id: 4, tokens: 10_000_000, label: 'AI Pro',     icon: Crown,    price: 14999 },
+];
+
 const loadCashfreeSDK = (): Promise<void> =>
   new Promise((resolve, reject) => {
     if (window.Cashfree) return resolve();
@@ -70,6 +77,11 @@ const Billing: React.FC = () => {
   const [liveTransactions, setLiveTransactions] = useState<any[] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [aiUsage, setAiUsage] = useState<AiTokenUsage | null>(null);
+
+  const [isAiPaymentOpen, setIsAiPaymentOpen] = useState(false);
+  const [selectedAiPackage, setSelectedAiPackage] = useState<number | null>(null);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiPaymentSuccess, setAiPaymentSuccess] = useState<{ tokens: number; orderId: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
@@ -179,6 +191,78 @@ const Billing: React.FC = () => {
     }
   };
 
+  const handleAiPayNow = async () => {
+    if (!selectedAiPackage) { toast.error('Please select an AI token package'); return; }
+    const pkg = aiTokenPackages.find(p => p.id === selectedAiPackage);
+    if (!pkg) return;
+
+    setIsAiProcessing(true);
+
+    try {
+      const { data } = await api.post('/api/payments/create-ai-order', { packageId: pkg.id });
+      if (!data.success) throw new Error(data.error || 'Order creation failed');
+
+      const { paymentSessionId, orderId } = data;
+
+      await loadCashfreeSDK();
+
+      setIsAiPaymentOpen(false);
+      await new Promise(resolve => setTimeout(resolve, 350));
+
+      const cashfree = window.Cashfree({
+        mode: import.meta.env.VITE_CASHFREE_ENV === 'TEST' ? 'sandbox' : 'production',
+      });
+
+      const checkoutPromise = cashfree.checkout({ paymentSessionId, redirectTarget: '_modal' });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 10 * 60 * 1000)
+      );
+
+      let result: any;
+      try {
+        result = await Promise.race([checkoutPromise, timeoutPromise]);
+      } catch (err: any) {
+        toast.error(err.message === 'timeout' ? 'Payment session expired.' : 'Payment was cancelled.');
+        setIsAiProcessing(false);
+        return;
+      }
+
+      if (result?.error) {
+        toast.error(result.error.message || 'Payment failed. Please try again.');
+        setIsAiProcessing(false);
+        return;
+      }
+
+      if (result?.redirect) return;
+
+      const verifyRes = await api.post('/api/payments/verify-ai', { orderId });
+      if (verifyRes.data?.success) {
+        toast.success(`🤖 ${pkg.tokens.toLocaleString()} AI tokens added!`);
+        await refreshBilling();
+        setAiPaymentSuccess({ tokens: pkg.tokens, orderId });
+        setIsAiPaymentOpen(true);
+      } else {
+        toast.error('Verification failed. Contact support.');
+      }
+
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Payment initiation failed.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const handleAiDialogClose = (open: boolean) => {
+    if (isAiProcessing) return;
+    setIsAiPaymentOpen(open);
+    if (!open) {
+      setTimeout(() => {
+        setSelectedAiPackage(null);
+        setAiPaymentSuccess(null);
+      }, 300);
+    }
+  };
+
   const allTransactions = liveTransactions ?? transactions;
 
   const filteredTransactions = useMemo(() => {
@@ -219,6 +303,7 @@ const Billing: React.FC = () => {
       case 'refund': return <ArrowUpRight className="w-4 h-4 text-blue-500" />;
       case 'subscription': return <Crown className="w-4 h-4 text-purple-500" />;
       case 'ai_usage': return <Bot className="w-4 h-4 text-violet-500" />;
+      case 'ai_token_purchase': return <Bot className="w-4 h-4 text-violet-600" />;
       default: return <Wallet className="w-4 h-4 text-muted-foreground" />;
     }
   };
@@ -234,6 +319,7 @@ const Billing: React.FC = () => {
 
   const currentBalance = liveBalance ?? dashboardStats?.credits ?? 0;
   const selectedPkg = creditPackages.find(p => p.id === selectedPackage);
+  const selectedAiPkg = aiTokenPackages.find(p => p.id === selectedAiPackage);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -435,14 +521,133 @@ const Billing: React.FC = () => {
 
       {/* ── AI Token Usage ── */}
       <motion.div variants={itemVariants}>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-950/40 flex items-center justify-center">
-            <Bot className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-950/40 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">AI Tokens</h2>
+            <span className="text-xs text-muted-foreground bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5 font-medium">
+              Separate from message credits
+            </span>
           </div>
-          <h2 className="text-lg font-semibold text-foreground">AI Tokens</h2>
-          <span className="text-xs text-muted-foreground bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 rounded-full px-2 py-0.5 font-medium">
-            Separate from message credits
-          </span>
+
+          {/* ─�� Buy AI Tokens Dialog ── */}
+          <Dialog open={isAiPaymentOpen} onOpenChange={handleAiDialogClose}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white text-xs">
+                <Bot className="w-3.5 h-3.5 mr-1.5" /> Buy AI Tokens
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 overflow-hidden">
+              <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
+                <DialogTitle className="text-sm font-semibold text-foreground">Buy AI Tokens</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Powers AI features · Charged per token · Secure via Cashfree</p>
+              </DialogHeader>
+
+              {aiPaymentSuccess ? (
+                <div className="px-4 py-8 flex flex-col items-center text-center gap-3">
+                  <div className="w-14 h-14 rounded-full bg-violet-100 flex items-center justify-center">
+                    <CheckCircle className="w-7 h-7 text-violet-600" />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-foreground">Payment Successful! 🤖</p>
+                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                      <span className="font-semibold text-foreground">{aiPaymentSuccess.tokens.toLocaleString()} AI tokens</span>{' '}
+                      have been added to your account instantly.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Order ID: <span className="font-mono">{aiPaymentSuccess.orderId}</span>
+                    </p>
+                  </div>
+                  <Button
+                    className="mt-2 bg-violet-600 hover:bg-violet-700 text-white"
+                    onClick={() => handleAiDialogClose(false)}
+                  >
+                    Done
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="px-4 py-3 space-y-2.5 overflow-y-auto max-h-[60vh]">
+                    <div className="space-y-2">
+                      {aiTokenPackages.map((pkg) => (
+                        <button
+                          key={pkg.id}
+                          type="button"
+                          onClick={() => setSelectedAiPackage(pkg.id)}
+                          className={cn(
+                            'relative w-full text-left rounded-xl border-2 px-3 py-2.5 transition-all focus:outline-none',
+                            selectedAiPackage === pkg.id
+                              ? 'border-violet-500 bg-violet-50 dark:bg-violet-950/20'
+                              : 'border-border hover:border-violet-300 bg-card'
+                          )}
+                        >
+                          {pkg.popular && (
+                            <span className="absolute -top-2 left-3 px-1.5 py-0.5 bg-violet-600 text-white text-[9px] font-bold rounded-full">
+                              POPULAR
+                            </span>
+                          )}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-950/30 flex items-center justify-center flex-shrink-0">
+                                <pkg.icon className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-foreground leading-tight">{pkg.tokens.toLocaleString()} tokens</p>
+                                <p className="text-[11px] text-muted-foreground">{pkg.label}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <p className="text-sm font-bold text-foreground">₹{pkg.price.toLocaleString()}</p>
+                              <div className={cn(
+                                'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                                selectedAiPackage === pkg.id ? 'bg-violet-600 border-violet-600' : 'border-border bg-background'
+                              )}>
+                                {selectedAiPackage === pkg.id && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-center gap-4 pt-1">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="w-3 h-3" /> Secure Payment</div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="w-3 h-3" /> Cashfree Encrypted</div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Zap className="w-3 h-3" /> Instant Tokens</div>
+                    </div>
+                  </div>
+
+                  <div className="px-4 py-3 border-t border-border bg-muted/30">
+                    {selectedAiPkg && (
+                      <div className="flex items-center justify-between mb-2.5 text-xs bg-card border border-border rounded-lg px-3 py-2">
+                        <span className="text-muted-foreground">{selectedAiPkg.tokens.toLocaleString()} tokens · {selectedAiPkg.label}</span>
+                        <span className="font-bold text-foreground text-sm">₹{selectedAiPkg.price.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="flex-1 h-10 text-sm" onClick={() => handleAiDialogClose(false)} disabled={isAiProcessing}>
+                        Cancel
+                      </Button>
+                      <Button
+                        className="flex-1 h-10 text-sm bg-violet-600 hover:bg-violet-700 text-white font-semibold"
+                        disabled={!selectedAiPackage || isAiProcessing}
+                        onClick={handleAiPayNow}
+                      >
+                        {isAiProcessing
+                          ? <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Processing...</>
+                          : <><Bot className="w-3.5 h-3.5 mr-1.5" /> Pay ₹{selectedAiPkg?.price.toLocaleString() ?? '—'}</>
+                        }
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground text-center mt-2">UPI · Cards · Net Banking · Wallets supported</p>
+                  </div>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -557,6 +762,7 @@ const Billing: React.FC = () => {
               <SelectItem value="credit">Credit</SelectItem>
               <SelectItem value="usage">Usage</SelectItem>
               <SelectItem value="ai_usage">AI Usage</SelectItem>
+              <SelectItem value="ai_token_purchase">AI Token Purchase</SelectItem>
               <SelectItem value="debit">Debit</SelectItem>
               <SelectItem value="refund">Refund</SelectItem>
             </SelectContent>
