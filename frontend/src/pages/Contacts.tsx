@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Plus, Search, Upload, Download, Edit, Trash2,
   Phone, Mail, Tag, MessageSquare, Ban, RefreshCw,
-  ChevronLeft, ChevronRight, X, Check,
+  ChevronLeft, ChevronRight, X, Check, Sparkles, Loader2,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -80,6 +80,10 @@ export default function Contacts() {
   const [thread, setThread]           = useState<any[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
 
+  const [aiSummaryContact, setAiSummaryContact] = useState<Contact | null>(null);
+  const [aiSummaryText, setAiSummaryText]       = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -112,6 +116,20 @@ export default function Contacts() {
     setSearch(v);
     clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => fetchContacts(0, v, filterOpt), 350);
+  };
+
+  // ── AI Summary ───────────────────────────────────────────────────────────────
+  const openAiSummary = async (c: Contact) => {
+    setAiSummaryContact(c);
+    setAiSummaryText('');
+    setAiSummaryLoading(true);
+    try {
+      const { data } = await api.post('/api/ai/contact-summary', { contactId: c.id });
+      setAiSummaryText(data.summary || '');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'AI unavailable');
+      setAiSummaryContact(null);
+    } finally { setAiSummaryLoading(false); }
   };
 
   // ── Thread ────────────────────────────────────────────────────────────────────
@@ -337,6 +355,9 @@ export default function Contacts() {
                         <DropdownMenuItem onClick={() => openThread(c)}>
                           <MessageSquare className="w-4 h-4 mr-2" /> View messages
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openAiSummary(c)}>
+                          <Sparkles className="w-4 h-4 mr-2 text-purple-500" /> AI Summary
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setEditContact(c); setForm({ name: c.name||'', phone: c.phone, email: c.email||'', tags: (c.tags||[]).join(', '), notes: c.notes||'' }); setShowCreate(true); }}>
                           <Edit className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
@@ -404,6 +425,27 @@ export default function Contacts() {
               <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : editContact ? 'Save changes' : 'Add contact'}</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── AI Summary dialog ───────────────────────────────────────────── */}
+      <Dialog open={!!aiSummaryContact} onOpenChange={v => { if (!v) setAiSummaryContact(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              AI Summary — {aiSummaryContact?.name || aiSummaryContact?.phone}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2 min-h-[80px]">
+            {aiSummaryLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+                <Loader2 className="w-4 h-4 animate-spin" /> Analysing conversation…
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed text-foreground">{aiSummaryText}</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

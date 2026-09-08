@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Plus, Trash2, Edit, Play, Pause, Users,
   ChevronRight, ArrowDown, Clock, RefreshCw,
+  Sparkles, Loader2,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -50,6 +51,12 @@ export default function Drip() {
   const [enrollSeq, setEnrollSeq]     = useState<Sequence | null>(null);
   const [enrollPhones, setEnrollPhones] = useState('');
   const [enrolling, setEnrolling]     = useState(false);
+
+  // AI drip suggester
+  const [aiDripOpen, setAiDripOpen]     = useState(false);
+  const [aiDripGoal, setAiDripGoal]     = useState('');
+  const [aiDripLoading, setAiDripLoading] = useState(false);
+  const [aiDripSteps, setAiDripSteps]   = useState<{template_name:string,delay_hours:number,hint:string}[]>([]);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -120,6 +127,25 @@ export default function Drip() {
       toast.success('Deleted');
       fetch();
     } catch { toast.error('Delete failed'); }
+  };
+
+  const suggestDripSteps = async () => {
+    if (!aiDripGoal.trim()) return;
+    setAiDripLoading(true);
+    setAiDripSteps([]);
+    try {
+      const { data } = await api.post('/api/ai/suggest-drip', { goal: aiDripGoal });
+      setAiDripSteps(data.steps || []);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'AI unavailable');
+    } finally { setAiDripLoading(false); }
+  };
+
+  const applyAiSteps = () => {
+    if (aiDripSteps.length === 0) return;
+    setSteps(aiDripSteps.map((s, i) => ({ template_name: s.template_name, language: 'en', delay_hours: s.delay_hours })));
+    setAiDripOpen(false);
+    toast.success(`Applied ${aiDripSteps.length} AI-suggested steps`);
   };
 
   const handleEnroll = async () => {
@@ -217,7 +243,14 @@ export default function Drip() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Steps</Label>
-                <Button size="sm" variant="outline" onClick={addStep}><Plus className="w-3.5 h-3.5 mr-1" /> Add step</Button>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="outline"
+                    onClick={() => { setAiDripGoal(''); setAiDripSteps([]); setAiDripOpen(true); }}
+                    className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/30">
+                    <Sparkles className="w-3.5 h-3.5 mr-1" /> Suggest with AI
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={addStep}><Plus className="w-3.5 h-3.5 mr-1" /> Add step</Button>
+                </div>
               </div>
 
               {steps.map((step, i) => (
@@ -260,6 +293,47 @@ export default function Drip() {
               <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : editSeq ? 'Save changes' : 'Create'}</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Drip Suggester dialog */}
+      <Dialog open={aiDripOpen} onOpenChange={v => { if (!v) setAiDripOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" /> Suggest drip steps with AI
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div>
+              <Label>Describe your campaign goal</Label>
+              <Textarea value={aiDripGoal} onChange={e => setAiDripGoal(e.target.value)} rows={3}
+                placeholder="e.g. Nurture new leads for a fitness app over 7 days, highlight features and drive trial sign-ups" />
+            </div>
+            <Button onClick={suggestDripSteps} disabled={aiDripLoading || !aiDripGoal.trim()} className="w-full">
+              {aiDripLoading ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Thinking…</> : 'Generate steps'}
+            </Button>
+
+            {aiDripSteps.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested sequence</p>
+                {aiDripSteps.map((s, i) => (
+                  <div key={i} className="rounded-lg border p-3 space-y-0.5 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-semibold text-primary">{s.template_name}</span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {i === 0 ? 'Immediately' : `+${s.delay_hours}h`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{s.hint}</p>
+                  </div>
+                ))}
+                <Button onClick={applyAiSteps} className="w-full mt-1">
+                  Use these {aiDripSteps.length} steps
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

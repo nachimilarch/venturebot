@@ -311,6 +311,8 @@ const Campaigns: React.FC = () => {
   const [analyticsCampaign, setAnalyticsCampaign] = useState<Campaign | null>(null);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState('');
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
 
   const [waConfig, setWaConfig] = useState<any>(null);
   const [isWaConfigured, setIsWaConfigured] = useState<boolean | null>(null);
@@ -538,6 +540,7 @@ const Campaigns: React.FC = () => {
   const openAnalytics = async (campaign: Campaign) => {
     setAnalyticsCampaign(campaign);
     setAnalyticsData(null);
+    setAiInsights('');
     setAnalyticsLoading(true);
     try {
       const { data } = await axios.get(`/api/campaigns/${campaign.id}/analytics`);
@@ -547,6 +550,17 @@ const Campaigns: React.FC = () => {
     } finally {
       setAnalyticsLoading(false);
     }
+  };
+
+  const loadAiInsights = async () => {
+    if (!analyticsCampaign) return;
+    setAiInsightsLoading(true);
+    try {
+      const { data } = await api.post('/api/ai/campaign-insights', { campaignId: analyticsCampaign.id });
+      setAiInsights(data.insights || '');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'AI unavailable');
+    } finally { setAiInsightsLoading(false); }
   };
 
   const runAiDraft = async () => {
@@ -1213,7 +1227,7 @@ const Campaigns: React.FC = () => {
       </motion.div>
 
       {/* ── Analytics dialog ──────────────────────────────────────────────── */}
-      <Dialog open={!!analyticsCampaign} onOpenChange={v => { if (!v) { setAnalyticsCampaign(null); setAnalyticsData(null); } }}>
+      <Dialog open={!!analyticsCampaign} onOpenChange={v => { if (!v) { setAnalyticsCampaign(null); setAnalyticsData(null); setAiInsights(''); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1250,6 +1264,26 @@ const Campaigns: React.FC = () => {
                   </div>
                 ))}
               </div>
+
+              {/* AI Insights */}
+              {aiInsights ? (
+                <div className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/20 p-3">
+                  <p className="text-xs font-medium text-purple-700 dark:text-purple-300 flex items-center gap-1 mb-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> AI Insights
+                  </p>
+                  <p className="text-sm text-purple-900 dark:text-purple-100 leading-relaxed">{aiInsights}</p>
+                </div>
+              ) : (
+                <button
+                  onClick={loadAiInsights}
+                  disabled={aiInsightsLoading}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-purple-300 dark:border-purple-700 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-colors disabled:opacity-60"
+                >
+                  {aiInsightsLoading
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating insights…</>
+                    : <><Sparkles className="w-3.5 h-3.5" /> Get AI insights</>}
+                </button>
+              )}
             </div>
           ) : null}
         </DialogContent>
