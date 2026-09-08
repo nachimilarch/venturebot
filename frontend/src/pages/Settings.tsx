@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Key, Save, Eye, EyeOff, Copy,
   CheckCircle2, XCircle, Loader2,
-  RefreshCw, Zap, Info, Bell, Clock, FileText,
+  RefreshCw, Zap, Info, Bell, Clock, FileText, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -605,6 +605,8 @@ const fetchWebhookUrl = async () => {
       {/* ── Notifications / Credit Alert ─────────────────────────────────── */}
       <CreditAlertCard />
 
+      <AiAutoresponderCard />
+
       {/* ── Invoice Download ──────────────────────────────────────────────── */}
       <InvoiceCard />
 
@@ -724,6 +726,60 @@ const CreditAlertCard: React.FC = () => {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
         {saving ? 'Saving…' : 'Save threshold'}
       </Button>
+    </motion.div>
+  );
+};
+
+// ─── AI Autoresponder Card ────────────────────────────────────────────────────
+const AiAutoresponderCard: React.FC = () => {
+  const [enabled, setEnabled] = useState(false);
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/tenant-settings').then(({ data }) => {
+      setEnabled(data.data?.ai_autoresponder_enabled === true || data.data?.ai_autoresponder_enabled === 'true');
+    }).catch(() => {});
+  }, []);
+
+  const toggle = async (val: boolean) => {
+    setEnabled(val);
+    setSaving(true);
+    try {
+      await axios.put('/api/tenant-settings/ai_autoresponder_enabled', { value: val ? 'true' : 'false' });
+      toast.success(val ? 'AI autoresponder enabled' : 'AI autoresponder disabled');
+    } catch {
+      setEnabled(!val);
+      toast.error('Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.28 }}
+      className="rounded-2xl border bg-card shadow-sm p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-purple-500" />
+        <h2 className="text-lg font-semibold">AI Autoresponder</h2>
+        <span className="ml-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
+          Powered by Ollama
+        </span>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        When enabled, inbound WhatsApp messages that don't match any keyword flow are answered automatically by AI (llama3.2:3b, hosted locally). Limited to 100 AI replies per day across all contacts.
+      </p>
+      <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+        <div>
+          <p className="font-medium text-sm">Enable AI autoresponder</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Replies to unmatched messages 24/7</p>
+        </div>
+        <Switch checked={enabled} onCheckedChange={toggle} disabled={saving} />
+      </div>
+      {enabled && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
+          AI responses use your daily limit (100/day). Custom flows and keyword triggers always take priority.
+        </p>
+      )}
     </motion.div>
   );
 };

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Trash2, Edit, ArrowDown, Play, Pause,
   ChevronLeft, MessageSquare, List, MousePointerClick,
-  FileText, Tag, Square, Save, RefreshCw, Zap,
+  FileText, Tag, Square, Save, RefreshCw, Zap, Sparkles, Loader2,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -194,6 +194,13 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
   const [addForm, setAddForm]     = useState<Omit<FlowNode,'id'>>(EMPTY_NODE);
   const [addBtns, setAddBtns]     = useState('');
 
+  // AI Flow Builder state
+  const [aiBuildOpen, setAiBuildOpen]   = useState(false);
+  const [aiDesc, setAiDesc]             = useState('');
+  const [aiBuilding, setAiBuilding]     = useState(false);
+  const [aiPreview, setAiPreview]       = useState<Omit<FlowNode,'id'>[] | null>(null);
+  const [aiCreating, setAiCreating]     = useState(false);
+
   const fetchNodes = useCallback(async () => {
     setLoading(true);
     try {
@@ -258,6 +265,39 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
     setEditBtns(node.buttons ? node.buttons.map(b => b.title).join('\n') : '');
   };
 
+  const buildWithAi = async () => {
+    if (!aiDesc.trim()) return toast.error('Describe the flow first');
+    setAiBuilding(true);
+    setAiPreview(null);
+    try {
+      const { data } = await api.post('/api/ai/build-flow', { description: aiDesc });
+      setAiPreview(data.nodes);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'AI unavailable');
+    } finally {
+      setAiBuilding(false);
+    }
+  };
+
+  const createAiNodes = async () => {
+    if (!aiPreview) return;
+    setAiCreating(true);
+    try {
+      for (const node of aiPreview) {
+        await api.post(`/api/flows/${flow.id}/nodes`, node);
+      }
+      toast.success(`${aiPreview.length} nodes created`);
+      setAiBuildOpen(false);
+      setAiDesc('');
+      setAiPreview(null);
+      fetchNodes();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Create failed');
+    } finally {
+      setAiCreating(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
       {/* Header */}
@@ -269,6 +309,13 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
         <Badge variant={flow.is_active ? 'default' : 'secondary'}>
           {flow.is_active ? 'Active' : 'Paused'}
         </Badge>
+        <Button
+          size="sm" variant="outline"
+          onClick={() => { setAiBuildOpen(true); setAiPreview(null); setAiDesc(''); }}
+          className="gap-1.5 text-purple-600 border-purple-200 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Build with AI
+        </Button>
       </div>
 
       {/* How it works */}
@@ -360,6 +407,84 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
             onSave={saveNode} onCancel={() => setEditNode(null)}
             saving={saving} title=""
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Build dialog */}
+      <Dialog open={aiBuildOpen} onOpenChange={v => { setAiBuildOpen(v); if (!v) setAiPreview(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" /> Build Flow with AI
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label>Describe your bot flow</Label>
+              <Textarea
+                placeholder="e.g. Greet the customer, ask if they want to book an appointment or get information, if book then ask for preferred time, confirm and say team will call back"
+                rows={4}
+                value={aiDesc}
+                onChange={e => setAiDesc(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Be specific — include the questions asked and options offered at each step.</p>
+            </div>
+            <Button
+              onClick={buildWithAi}
+              disabled={aiBuilding || !aiDesc.trim()}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {aiBuilding
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating nodes…</>
+                : <><Sparkles className="w-4 h-4 mr-2" /> Generate Flow</>
+              }
+            </Button>
+
+            {aiPreview && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">{aiPreview.length} nodes generated — preview:</p>
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {aiPreview.map((node, i) => (
+                    <div key={i} className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-primary/10 text-primary text-xs font-mono px-2 py-0.5 rounded-full">
+                          {node.trigger}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{node.message_type}</span>
+                        {node.next_trigger && (
+                          <span className="text-xs text-muted-foreground ml-auto">→ {node.next_trigger}</span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground line-clamp-2">{node.message}</p>
+                      {node.buttons && (
+                        <div className="flex gap-1 flex-wrap">
+                          {(node.buttons as {id:string;title:string}[]).map(b => (
+                            <span key={b.id} className="border rounded-full text-xs px-2 py-0.5">{b.title}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAiPreview(null)} className="flex-1">
+                    Regenerate
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={createAiNodes}
+                    disabled={aiCreating}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    {aiCreating
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating…</>
+                      : `Create ${aiPreview.length} nodes`
+                    }
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
