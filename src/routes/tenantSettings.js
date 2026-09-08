@@ -31,6 +31,7 @@ router.put('/:key', async (req, res) => {
       'credit_alert_threshold',
       'business_hours',
       'notifications',
+      'ai_autoresponder_enabled',
     ];
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ success: false, error: 'Unknown setting key' });

@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const OLLAMA_URL   = 'http://localhost:11434/api/chat';
 const MODEL        = 'llama3.2:3b';
-const TIMEOUT_MS   = 30_000;
+const TIMEOUT_MS   = 90_000;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DAILY_LIMIT  = 100;             // AI calls per tenant per day
 const CACHE_MAX    = 300;
@@ -55,7 +55,7 @@ function usageRemaining(tenantId) {
 }
 
 // ── Ollama HTTP call ──────────────────────────────────────────────────────────
-async function callOllama(systemPrompt, userPrompt) {
+async function callOllama(systemPrompt, userPrompt, maxTokens = 400) {
   const { data } = await axios.post(
     OLLAMA_URL,
     {
@@ -65,7 +65,7 @@ async function callOllama(systemPrompt, userPrompt) {
         { role: 'user',   content: userPrompt   },
       ],
       stream:  false,
-      options: { temperature: 0.7, num_predict: 400 },
+      options: { temperature: 0.7, num_predict: maxTokens },
     },
     { timeout: TIMEOUT_MS }
   );
@@ -73,7 +73,7 @@ async function callOllama(systemPrompt, userPrompt) {
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
-export async function ollamaChat({ tenantId, feature, systemPrompt, userPrompt }) {
+export async function ollamaChat({ tenantId, feature, systemPrompt, userPrompt, maxTokens }) {
   if (!withinLimit(tenantId)) {
     throw Object.assign(new Error('Daily AI limit reached (100/day). Resets at midnight.'), { code: 'RATE_LIMIT' });
   }
@@ -82,7 +82,7 @@ export async function ollamaChat({ tenantId, feature, systemPrompt, userPrompt }
   const cached = cacheGet(cacheKey);
   if (cached) return { text: cached, cached: true, remaining: usageRemaining(tenantId) };
 
-  const text = await enqueue(() => callOllama(systemPrompt, userPrompt));
+  const text = await enqueue(() => callOllama(systemPrompt, userPrompt, maxTokens));
   cacheSet(cacheKey, text);
   return { text, cached: false, remaining: usageRemaining(tenantId) };
 }

@@ -2,6 +2,7 @@
 import pool from '../config/database.js';
 import whatsappTemplateService from './whatsappTemplateService.js';
 import { getWhatsAppConfig } from './whatsappConfigService.js';
+import { ollamaChat } from './ollamaService.js';
 
 
 // ─── Send helpers ─────────────────────────────────────────────────────────────
@@ -347,6 +348,59 @@ async function processCustomFlowNode(tenantId, from, inputNorm, waConfig) {
   return true;
 }
 
+// ─── AI Auto-responder ────────────────────────────────────────────────────────
+// Fallback when no custom flow or hardcoded flow config is found for a tenant.
+// Returns true if a response was sent, false if disabled or error.
+async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
+  try {
+    const [[setting]] = await pool.execute(
+      "SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = 'ai_autoresponder_enabled'",
+      [tenantId]
+    );
+    if (!setting || setting.value !== 'true') return false;
+
+    const [[tenant]] = await pool.execute(
+      'SELECT name FROM tenants WHERE id = ? LIMIT 1', [tenantId]
+    );
+    const tenantName = tenant?.name || 'our business';
+
+    const [msgs] = await pool.execute(
+      `SELECT direction, message FROM message_logs
+       WHERE tenant_id = ? AND contact_phone = ?
+       ORDER BY COALESCE(sent_at, received_at) DESC LIMIT 8`,
+      [tenantId, from]
+    );
+    const history = msgs.reverse()
+      .map(m => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.message}`)
+      .join('\n');
+
+    const systemPrompt = `You are a helpful WhatsApp assistant for ${tenantName}.
+Reply in 1-2 short sentences. Be friendly and professional.
+If you cannot help with something specific, offer to connect them with the team.
+Never make up prices, dates, or details you don't know.`;
+
+    const userPrompt = history
+      ? `Conversation:\n${history}\n\nRespond to the customer's latest message.`
+      : `Customer says: ${userInput}\n\nWrite a friendly, helpful reply.`;
+
+    const { text } = await ollamaChat({
+      tenantId: String(tenantId),
+      feature: 'autoresponder',
+      systemPrompt,
+      userPrompt,
+    });
+
+    if (text) {
+      await sendText(from, text, waConfig);
+      console.log(`[Flow] AI autoresponder replied to ${from}`);
+    }
+    return true;
+  } catch (err) {
+    console.error('[Flow] AI autoresponder error:', err.message);
+    return false;
+  }
+}
+
 export async function processFlow(tenantId, from, userInput, rawMessage) {
   await logInbound(tenantId, from, userInput);
 
@@ -377,7 +431,7 @@ export async function processFlow(tenantId, from, userInput, rawMessage) {
 
   const flowConfig = await getTenantFlowConfig(tenantId);
   if (!flowConfig) {
-    console.log(`[Flow] No auto-reply configured for tenant ${tenantId} — skipping`);
+    await tryAiAutoRespond(tenantId, from, userInput, waConfig);
     return;
   }
 
