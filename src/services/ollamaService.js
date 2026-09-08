@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const OLLAMA_URL   = 'http://localhost:11434/api/chat';
 const MODEL        = 'llama3.2:3b';
-const TIMEOUT_MS   = 90_000;
+const TIMEOUT_MS   = 150_000;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DAILY_LIMIT  = 100;             // AI calls per tenant per day
 const CACHE_MAX    = 300;

@@ -221,26 +221,18 @@ router.post('/build-flow', async (req, res) => {
     const bal = await checkTokenBalance(tenantId);
     if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
 
-    const systemPrompt = `You are a WhatsApp chatbot designer. Convert a plain-English flow description into structured bot nodes.
-Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
-Each node must have exactly these fields:
-- trigger: short lowercase keyword (e.g. "hi", "book", "confirm") — unique across nodes
-- message: the bot's reply text (keep under 200 chars)
-- message_type: "text" | "buttons" (use buttons when giving options)
-- buttons: array of {id, title} objects if message_type is "buttons" (max 3 buttons), else null
-- next_trigger: the trigger of the next expected node, or null if end of flow
+    const systemPrompt = `WhatsApp bot designer. Output ONLY a JSON array, no extra text.
+Max 4 nodes. Each node: {"trigger":"keyword","message":"reply under 100 chars","message_type":"text|buttons","buttons":[{"id":"b1","title":"Option"}]|null,"next_trigger":"keyword|null"}
+Example: [{"trigger":"hi","message":"Hi! Book or get info?","message_type":"buttons","buttons":[{"id":"b1","title":"Book"},{"id":"b2","title":"Info"}],"next_trigger":"book"},{"trigger":"book","message":"Share your preferred time.","message_type":"text","buttons":null,"next_trigger":null}]`;
 
-Example output:
-[{"trigger":"hi","message":"Hello! How can I help you?","message_type":"buttons","buttons":[{"id":"btn_1","title":"Book Appointment"},{"id":"btn_2","title":"Get Info"}],"next_trigger":"book"},{"trigger":"book","message":"Please share your preferred date and time.","message_type":"text","buttons":null,"next_trigger":null}]`;
-
-    const userPrompt = `Create a WhatsApp bot flow for this description:\n${description}`;
+    const userPrompt = `Flow: ${description.slice(0, 200)}`;
 
     const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'build-flow',
       systemPrompt,
       userPrompt,
-      maxTokens: 800,
+      maxTokens: 500,
     });
 
     await recordAiTokenUsage(tenantId, 'build-flow', inputTokens, outputTokens, cached);
