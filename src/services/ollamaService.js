@@ -54,6 +54,20 @@ function usageRemaining(tenantId) {
   return Math.max(0, DAILY_LIMIT - count);
 }
 
+// ── Daily token tracking (in-memory, resets on server restart) ────────────────
+const tokenUsageMap = new Map(); // `${tenantId}:YYYY-MM-DD` → tokens
+
+function recordDailyTokens(tenantId, tokens) {
+  const today = new Date().toISOString().slice(0, 10);
+  const key   = `${tenantId}:${today}`;
+  tokenUsageMap.set(key, (tokenUsageMap.get(key) || 0) + tokens);
+}
+
+export function getDailyTokensUsed(tenantId) {
+  const today = new Date().toISOString().slice(0, 10);
+  return tokenUsageMap.get(`${tenantId}:${today}`) || 0;
+}
+
 // ── Ollama HTTP call ──────────────────────────────────────────────────────────
 async function callOllama(systemPrompt, userPrompt, maxTokens = 400) {
   const { data } = await axios.post(
@@ -69,20 +83,27 @@ async function callOllama(systemPrompt, userPrompt, maxTokens = 400) {
     },
     { timeout: TIMEOUT_MS }
   );
-  return (data.message?.content || '').trim();
+  const text         = (data.message?.content || '').trim();
+  const inputTokens  = data.prompt_eval_count  || 0;
+  const outputTokens = data.eval_count         || 0;
+  return { text, inputTokens, outputTokens };
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 export async function ollamaChat({ tenantId, feature, systemPrompt, userPrompt, maxTokens }) {
   if (!withinLimit(tenantId)) {
-    throw Object.assign(new Error('Daily AI limit reached (100/day). Resets at midnight.'), { code: 'RATE_LIMIT' });
+    throw Object.assign(new Error('Daily AI call limit reached (100/day). Resets at midnight.'), { code: 'RATE_LIMIT' });
   }
 
   const cacheKey = `${feature}:${userPrompt}`.slice(0, 600);
   const cached = cacheGet(cacheKey);
-  if (cached) return { text: cached, cached: true, remaining: usageRemaining(tenantId) };
+  if (cached) {
+    return { text: cached.text, inputTokens: cached.inputTokens, outputTokens: cached.outputTokens,
+             cached: true, remaining: usageRemaining(tenantId) };
+  }
 
-  const text = await enqueue(() => callOllama(systemPrompt, userPrompt, maxTokens));
-  cacheSet(cacheKey, text);
-  return { text, cached: false, remaining: usageRemaining(tenantId) };
+  const { text, inputTokens, outputTokens } = await enqueue(() => callOllama(systemPrompt, userPrompt, maxTokens));
+  cacheSet(cacheKey, { text, inputTokens, outputTokens });
+  recordDailyTokens(tenantId, inputTokens + outputTokens);
+  return { text, inputTokens, outputTokens, cached: false, remaining: usageRemaining(tenantId) };
 }

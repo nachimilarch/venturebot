@@ -2,10 +2,109 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import pool from '../config/database.js';
-import { ollamaChat } from '../services/ollamaService.js';
+import { ollamaChat, getDailyTokensUsed } from '../services/ollamaService.js';
 
 const router = Router();
 router.use(authMiddleware);
+
+// ── Token tracking helpers ────────────────────────────────────────────────────
+// Check balance; returns { ok, balance } without deducting
+async function checkTokenBalance(tenantId) {
+  const [[row]] = await pool.execute(
+    'SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]
+  );
+  const balance = Number(row?.ai_tokens_balance ?? 0);
+  return { ok: balance > 0, balance };
+}
+
+// Log usage to ai_usage_logs and deduct from ai_tokens_balance
+async function recordAiTokenUsage(tenantId, feature, inputTokens, outputTokens, cached) {
+  const total = inputTokens + outputTokens;
+  if (total === 0 && !cached) return; // nothing to record for 0-token responses
+  await pool.execute(
+    `INSERT INTO ai_usage_logs
+       (tenant_id, feature, model, input_tokens, output_tokens, total_tokens, cached, created_at)
+     VALUES (?, ?, 'llama3.2:3b', ?, ?, ?, ?, NOW())`,
+    [tenantId, feature, inputTokens, outputTokens, total, cached ? 1 : 0]
+  );
+  if (total > 0 && !cached) {
+    await pool.execute(
+      'UPDATE tenants SET ai_tokens_balance = GREATEST(0, ai_tokens_balance - ?) WHERE id = ?',
+      [total, tenantId]
+    );
+  }
+}
+
+// ── GET /api/ai/token-usage ───────────────────────────────────────────────────
+// Returns token usage stats for current session (today) + this month + per-feature
+router.get('/token-usage', async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    // Current balance
+    const [[tenant]] = await pool.execute(
+      'SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]
+    );
+    const balance = Number(tenant?.ai_tokens_balance ?? 0);
+
+    // Today's usage from in-memory counter (session)
+    const tokensToday = getDailyTokensUsed(tenantId);
+
+    // DB: this month per-feature
+    const [byFeature] = await pool.execute(
+      `SELECT feature,
+         COUNT(*) AS calls,
+         SUM(input_tokens) AS input_tokens,
+         SUM(output_tokens) AS output_tokens,
+         SUM(total_tokens) AS total_tokens
+       FROM ai_usage_logs
+       WHERE tenant_id = ? AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+       GROUP BY feature ORDER BY total_tokens DESC`,
+      [tenantId]
+    );
+
+    // DB: this month totals
+    const [[month]] = await pool.execute(
+      `SELECT COUNT(*) AS calls, SUM(total_tokens) AS tokens
+       FROM ai_usage_logs
+       WHERE tenant_id = ? AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`,
+      [tenantId]
+    );
+
+    // DB: all-time totals
+    const [[allTime]] = await pool.execute(
+      `SELECT COUNT(*) AS calls, SUM(total_tokens) AS tokens
+       FROM ai_usage_logs WHERE tenant_id = ?`,
+      [tenantId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        balance,
+        session: { tokens: tokensToday },
+        thisMonth: {
+          calls:  Number(month?.calls  ?? 0),
+          tokens: Number(month?.tokens ?? 0),
+        },
+        allTime: {
+          calls:  Number(allTime?.calls  ?? 0),
+          tokens: Number(allTime?.tokens ?? 0),
+        },
+        byFeature: byFeature.map(r => ({
+          feature:      r.feature,
+          calls:        Number(r.calls),
+          inputTokens:  Number(r.input_tokens),
+          outputTokens: Number(r.output_tokens),
+          totalTokens:  Number(r.total_tokens),
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('[ai/token-usage]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── POST /api/ai/suggest-reply ────────────────────────────────────────────────
 // Body: { phone }  →  { suggestions: string[] }
@@ -15,6 +114,9 @@ router.post('/suggest-reply', async (req, res) => {
     if (!phone) return res.status(400).json({ error: 'phone is required' });
 
     const tenantId = req.user.tenantId;
+
+    const bal = await checkTokenBalance(tenantId);
+    if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
 
     // Fetch last 12 messages for context
     const [rows] = await pool.execute(
@@ -37,12 +139,14 @@ Example: ["Sure, let me check that for you!", "Can you share more details?", "I'
       ? `Conversation so far:\n${history}\n\nSuggest 3 reply options for the agent.`
       : 'No messages yet. Suggest 3 friendly opening greetings for a WhatsApp business chat.';
 
-    const { text, remaining } = await ollamaChat({
+    const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'suggest-reply',
       systemPrompt,
       userPrompt,
     });
+
+    await recordAiTokenUsage(tenantId, 'suggest-reply', inputTokens, outputTokens, cached);
 
     // Parse JSON array from model output
     const match = text.match(/\[[\s\S]*?\]/);
@@ -56,7 +160,7 @@ Example: ["Sure, let me check that for you!", "Can you share more details?", "I'
       suggestions = text.split('\n').filter(l => l.trim()).slice(0, 3);
     }
 
-    res.json({ suggestions: suggestions.slice(0, 3), remaining });
+    res.json({ suggestions: suggestions.slice(0, 3), remaining, tokensUsed: inputTokens + outputTokens });
   } catch (err) {
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/suggest-reply]', err.message);
@@ -73,6 +177,9 @@ router.post('/draft-campaign', async (req, res) => {
 
     const tenantId = req.user.tenantId;
 
+    const bal = await checkTokenBalance(tenantId);
+    if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
+
     // Fetch tenant name for context
     const [[tenant]] = await pool.execute(
       'SELECT name FROM tenants WHERE id = ?', [tenantId]
@@ -85,14 +192,16 @@ Tone: ${tone}. Target audience: ${audience}.`;
 
     const userPrompt = `Write a WhatsApp marketing message for this goal: ${goal}`;
 
-    const { text, remaining } = await ollamaChat({
+    const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'draft-campaign',
       systemPrompt,
       userPrompt,
     });
 
-    res.json({ message: text, remaining });
+    await recordAiTokenUsage(tenantId, 'draft-campaign', inputTokens, outputTokens, cached);
+
+    res.json({ message: text, remaining, tokensUsed: inputTokens + outputTokens });
   } catch (err) {
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/draft-campaign]', err.message);
@@ -109,6 +218,9 @@ router.post('/build-flow', async (req, res) => {
 
     const tenantId = req.user.tenantId;
 
+    const bal = await checkTokenBalance(tenantId);
+    if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
+
     const systemPrompt = `You are a WhatsApp chatbot designer. Convert a plain-English flow description into structured bot nodes.
 Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
 Each node must have exactly these fields:
@@ -123,13 +235,15 @@ Example output:
 
     const userPrompt = `Create a WhatsApp bot flow for this description:\n${description}`;
 
-    const { text, remaining } = await ollamaChat({
+    const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'build-flow',
       systemPrompt,
       userPrompt,
       maxTokens: 800,
     });
+
+    await recordAiTokenUsage(tenantId, 'build-flow', inputTokens, outputTokens, cached);
 
     // Extract JSON array from output
     const match = text.match(/\[[\s\S]*\]/);
@@ -157,7 +271,7 @@ Example output:
       next_trigger: n.next_trigger ? String(n.next_trigger).toLowerCase().replace(/\s+/g, '_').slice(0, 30) : null,
     }));
 
-    res.json({ nodes, remaining });
+    res.json({ nodes, remaining, tokensUsed: inputTokens + outputTokens });
   } catch (err) {
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/build-flow]', err.message);
@@ -174,6 +288,9 @@ router.post('/suggest-drip', async (req, res) => {
 
     const tenantId = req.user.tenantId;
 
+    const bal = await checkTokenBalance(tenantId);
+    if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
+
     const systemPrompt = `You are a WhatsApp drip sequence planner.
 Given a nurture or campaign goal, return a suggested sequence of 3-5 steps.
 Return ONLY a JSON array. No markdown, no explanation, no extra text.
@@ -186,13 +303,15 @@ Example: [{"template_name":"welcome_intro","delay_hours":0,"hint":"Introduce the
 
     const userPrompt = `Suggest a WhatsApp drip sequence for this goal:\n${goal}`;
 
-    const { text, remaining } = await ollamaChat({
+    const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'suggest-drip',
       systemPrompt,
       userPrompt,
       maxTokens: 600,
     });
+
+    await recordAiTokenUsage(tenantId, 'suggest-drip', inputTokens, outputTokens, cached);
 
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return res.status(422).json({ error: 'AI did not return valid steps — try rephrasing your goal' });
@@ -213,7 +332,7 @@ Example: [{"template_name":"welcome_intro","delay_hours":0,"hint":"Introduce the
       hint:          String(s.hint || '').slice(0, 200),
     }));
 
-    res.json({ steps, remaining });
+    res.json({ steps, remaining, tokensUsed: inputTokens + outputTokens });
   } catch (err) {
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/suggest-drip]', err.message);
@@ -229,6 +348,9 @@ router.post('/contact-summary', async (req, res) => {
     if (!contactId) return res.status(400).json({ error: 'contactId is required' });
 
     const tenantId = req.user.tenantId;
+
+    const bal = await checkTokenBalance(tenantId);
+    if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
 
     const [[contact]] = await pool.execute(
       'SELECT name, phone, email, tags, notes, opt_out, created_at FROM contacts WHERE id = ? AND tenant_id = ?',
@@ -267,7 +389,7 @@ Return only the summary text — no labels, no bullet points, no markdown.`;
 
     const userPrompt = `Contact profile:\n${contactInfo}\n\nRecent messages (${messages.length}):\n${history || 'No messages yet.'}`;
 
-    const { text, remaining } = await ollamaChat({
+    const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'contact-summary',
       systemPrompt,
@@ -275,7 +397,9 @@ Return only the summary text — no labels, no bullet points, no markdown.`;
       maxTokens: 300,
     });
 
-    res.json({ summary: text, remaining });
+    await recordAiTokenUsage(tenantId, 'contact-summary', inputTokens, outputTokens, cached);
+
+    res.json({ summary: text, remaining, tokensUsed: inputTokens + outputTokens });
   } catch (err) {
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/contact-summary]', err.message);
@@ -291,6 +415,9 @@ router.post('/campaign-insights', async (req, res) => {
     if (!campaignId) return res.status(400).json({ error: 'campaignId is required' });
 
     const tenantId = req.user.tenantId;
+
+    const bal = await checkTokenBalance(tenantId);
+    if (!bal.ok) return res.status(402).json({ error: 'AI token balance empty. Top up in Billing → AI Tokens.', code: 'NO_AI_TOKENS', balance: bal.balance });
 
     const [[campaign]] = await pool.execute(
       `SELECT name, status, target_audience,
@@ -319,7 +446,7 @@ Return only the insight text — no headers, no bullets, no markdown.`;
 Target audience: ${campaign.target_audience || 'all contacts'}
 Metrics: ${total} targeted, ${sent} sent, ${delivered} delivered (${delivRate}% delivery rate), ${readCount} read (${readRate}% read rate), ${failed} failed.`;
 
-    const { text, remaining } = await ollamaChat({
+    const { text, inputTokens, outputTokens, cached, remaining } = await ollamaChat({
       tenantId,
       feature: 'campaign-insights',
       systemPrompt,
@@ -327,7 +454,9 @@ Metrics: ${total} targeted, ${sent} sent, ${delivered} delivered (${delivRate}% 
       maxTokens: 250,
     });
 
-    res.json({ insights: text, remaining });
+    await recordAiTokenUsage(tenantId, 'campaign-insights', inputTokens, outputTokens, cached);
+
+    res.json({ insights: text, remaining, tokensUsed: inputTokens + outputTokens });
   } catch (err) {
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/campaign-insights]', err.message);
