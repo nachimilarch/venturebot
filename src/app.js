@@ -39,6 +39,7 @@ import inboxRouter from './routes/inbox.js';
 import tenantSettingsRouter from './routes/tenantSettings.js';
 import dripRouter from './routes/drip.js';
 import onboardingRouter from './routes/onboarding.js';
+import aiRouter from './routes/ai.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
 import { startDripScheduler } from './services/dripScheduler.js';
 
@@ -111,6 +112,9 @@ app.use('/api/drip', dripRouter);
 
 // Onboarding status
 app.use('/api/onboarding', onboardingRouter);
+
+// AI features (Ollama-backed)
+app.use('/api/ai', aiRouter);
 
 // CRM Integration API v1 (API-key-protected)
 app.use('/api/v1/credits',   v1CreditsRouter);
