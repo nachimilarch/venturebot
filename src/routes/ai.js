@@ -198,7 +198,8 @@ Example: [{"template_name":"welcome_intro","delay_hours":0,"hint":"Introduce the
     if (!match) return res.status(422).json({ error: 'AI did not return valid steps — try rephrasing your goal' });
 
     let steps;
-    try { steps = JSON.parse(match[0]); } catch {
+    try { steps = JSON.parse(match[0]); } catch (parseErr) {
+      console.error('[ai/suggest-drip] JSON parse failed, raw:', match[0].slice(0, 300));
       return res.status(422).json({ error: 'AI returned malformed JSON — try rephrasing' });
     }
 
