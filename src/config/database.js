@@ -11,7 +11,8 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'whatsapp_bulk',
   waitForConnections: true,
-  queueLimit: 0
+  connectionLimit:  30,
+  queueLimit:       0,
 });
 
 export default pool;
