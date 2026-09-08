@@ -31,6 +31,13 @@ const CREDIT_PACKAGES = {
   5: { credits: 30000, price: 44999, name: 'Enterprise' },
 };
 
+const AI_TOKEN_PACKAGES = {
+  1: { tokens: 100_000,    price: 299,   name: 'AI Starter' },
+  2: { tokens: 500_000,    price: 999,   name: 'AI Basic'   },
+  3: { tokens: 2_000_000,  price: 3499,  name: 'AI Growth'  },
+  4: { tokens: 10_000_000, price: 14999, name: 'AI Pro'     },
+};
+
 const SUBSCRIPTION_PLANS = {
   starter: { name: 'Starter', price: 1499, priceYearly: 14990, conversations: 1000, users: 3, popular: false },
   growth: { name: 'Growth', price: 2999, priceYearly: 29990, conversations: 5000, users: 10, popular: true },
@@ -41,7 +48,7 @@ const SUBSCRIPTION_PLANS = {
 // ─── GET /api/payments/plans (public) ─────────────────────────────────────────
 
 router.get('/plans', (req, res) => {
-  res.json({ success: true, data: { creditPackages: CREDIT_PACKAGES, subscriptionPlans: SUBSCRIPTION_PLANS } });
+  res.json({ success: true, data: { creditPackages: CREDIT_PACKAGES, subscriptionPlans: SUBSCRIPTION_PLANS, aiTokenPackages: AI_TOKEN_PACKAGES } });
 });
 
 // ─── POST /api/payments/cashfree/webhook (public — called by Cashfree) ────────
@@ -84,11 +91,19 @@ router.post('/cashfree/webhook', express.raw({ type: '*/*' }), async (req, res) 
           'UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
           [paymentId, orderId]
         );
-        await pool.execute(
-          'UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?',
-          [txn.credits, txn.tenant_id]
-        );
-        console.log(`[Cashfree:webhook] ✅ Credited ${txn.credits} to tenant ${txn.tenant_id}`);
+        if (txn.type === 'ai_token_purchase') {
+          await pool.execute(
+            'UPDATE tenants SET ai_tokens_balance = ai_tokens_balance + ? WHERE id = ?',
+            [txn.credits, txn.tenant_id]
+          );
+          console.log(`[Cashfree:webhook] ✅ AI tokens +${txn.credits} to tenant ${txn.tenant_id}`);
+        } else {
+          await pool.execute(
+            'UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?',
+            [txn.credits, txn.tenant_id]
+          );
+          console.log(`[Cashfree:webhook] ✅ Credited ${txn.credits} to tenant ${txn.tenant_id}`);
+        }
       } else if (txn?.status === 'completed') {
         console.log(`[Cashfree:webhook] ℹ️  Already processed: ${orderId}`);
       } else {
@@ -267,6 +282,128 @@ router.post('/verify', async (req, res) => {
     res.json({ success: false, status: data.order_status });
   } catch (err) {
     console.error('[Cashfree:verify]', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'Verification failed' });
+  }
+});
+
+// ─── POST /api/payments/create-ai-order ──────────────────────────────────────
+
+router.post('/create-ai-order', async (req, res) => {
+  try {
+    const { packageId } = req.body;
+    const pkg = AI_TOKEN_PACKAGES[packageId];
+    if (!pkg) return res.status(400).json({ success: false, error: 'Invalid AI token package' });
+
+    const tenantId = req.user.tenantId;
+    const orderId = `VBAI_${tenantId}_${Date.now()}`;
+
+    const [[tenant]] = await pool.execute(
+      `SELECT
+         t.name,
+         u.email,
+         REGEXP_REPLACE(wc.display_phone_number, '[^0-9]', '') AS phone
+       FROM tenants t
+       LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'admin'
+       LEFT JOIN whatsapp_config wc ON wc.tenant_id = t.id AND wc.is_active = 1
+       WHERE t.id = ? LIMIT 1`,
+      [tenantId]
+    );
+
+    const rawPhone = tenant?.phone || '';
+    const cleanPhone = rawPhone.length === 12 ? rawPhone.slice(2) : rawPhone.slice(-10);
+    const finalPhone = cleanPhone || '9999999999';
+
+    const FRONTEND = (process.env.FRONTEND_URL || 'https://vaartabot.com').replace(/\/$/, '');
+    const BACKEND = (process.env.BACKEND_URL || 'https://api.vaartabot.com').replace(/\/$/, '');
+
+    const { data } = await axios.post(
+      `${getCFBase()}/orders`,
+      {
+        order_id: orderId,
+        order_amount: pkg.price,
+        order_currency: 'INR',
+        customer_details: {
+          customer_id: `tenant_${tenantId}`,
+          customer_name: tenant?.name || 'VaartaBot User',
+          customer_email: tenant?.email || 'noreply@vaartabot.in',
+          customer_phone: finalPhone,
+        },
+        order_meta: {
+          return_url: `${FRONTEND}/billing?status=success&order_id=${orderId}`,
+          notify_url: `${BACKEND}/api/payments/cashfree/webhook`,
+        },
+        order_note: `${pkg.name} — ${pkg.tokens.toLocaleString()} AI tokens`,
+      },
+      { headers: getCFHeaders() }
+    );
+
+    await pool.execute(
+      `INSERT INTO transactions
+         (tenant_id, type, amount, credits, description, status, transaction_ref, created_at)
+       VALUES (?, 'ai_token_purchase', ?, ?, ?, 'pending', ?, NOW())`,
+      [tenantId, pkg.price, pkg.tokens, `${pkg.name} — ${pkg.tokens.toLocaleString()} AI tokens`, orderId]
+    );
+
+    console.log(`[Cashfree] 🤖 AI order: ${orderId} | tenant:${tenantId} | ₹${pkg.price}`);
+
+    res.json({
+      success: true,
+      orderId,
+      paymentSessionId: data.payment_session_id,
+      amount: pkg.price,
+      packageInfo: pkg,
+    });
+  } catch (err) {
+    console.error('[Cashfree:create-ai-order]', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'Failed to create AI token order' });
+  }
+});
+
+// ─── POST /api/payments/verify-ai ────────────────────────────────────────────
+
+router.post('/verify-ai', async (req, res) => {
+  try {
+    const { orderId } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const { data } = await axios.get(
+      `${getCFBase()}/orders/${orderId}`,
+      { headers: getCFHeaders() }
+    );
+
+    console.log(`[Cashfree:verify-ai] order:${orderId} status:${data.order_status}`);
+
+    if (data.order_status === 'PAID') {
+      const [[txn]] = await pool.execute(
+        'SELECT * FROM transactions WHERE transaction_ref = ? AND tenant_id = ? LIMIT 1',
+        [orderId, tenantId]
+      );
+
+      if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
+
+      if (txn.status === 'completed') {
+        const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
+        return res.json({ success: true, tokensAdded: txn.credits, newBalance: t.ai_tokens_balance, alreadyProcessed: true });
+      }
+
+      await pool.execute(
+        'UPDATE transactions SET status = "completed", updated_at = NOW() WHERE transaction_ref = ?',
+        [orderId]
+      );
+      await pool.execute(
+        'UPDATE tenants SET ai_tokens_balance = ai_tokens_balance + ? WHERE id = ?',
+        [txn.credits, tenantId]
+      );
+
+      const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
+
+      console.log(`[Cashfree:verify-ai] ✅ AI tokens +${txn.credits} to tenant ${tenantId}`);
+      return res.json({ success: true, tokensAdded: txn.credits, newBalance: t.ai_tokens_balance });
+    }
+
+    res.json({ success: false, status: data.order_status });
+  } catch (err) {
+    console.error('[Cashfree:verify-ai]', err.response?.data || err.message);
     res.status(500).json({ success: false, error: 'Verification failed' });
   }
 });
