@@ -80,6 +80,64 @@ const EyeToggle: React.FC<{ show: boolean; onToggle: () => void }> = ({ show, on
   </Button>
 );
 
+// ─── Company Profile Card ─────────────────────────────────────────────────────
+const INDUSTRY_OPTIONS = [
+  'Software Development', 'Real Estate', 'Healthcare', 'Education', 'Retail',
+  'E-Commerce', 'Finance', 'Logistics', 'Hospitality', 'Manufacturing',
+  'Consulting', 'Marketing', 'Legal', 'Nutrition / Wellness', 'Other',
+];
+
+const CompanyProfileCard: React.FC = () => {
+  const [name, setName]         = useState('');
+  const [industry, setIndustry] = useState('');
+  const [saving, setSaving]     = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/tenant').then(({ data }) => {
+      if (data.success && data.data) {
+        setName(data.data.name || '');
+        setIndustry(data.data.industry || '');
+      }
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    if (!name.trim()) { toast.error('Company name is required'); return; }
+    setSaving(true);
+    try {
+      await axios.put('/api/tenant', { name: name.trim(), industry });
+      toast.success('Company profile saved');
+    } catch { toast.error('Save failed'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+      className="rounded-2xl border bg-card shadow-sm p-6 space-y-4">
+      <h3 className="font-semibold text-foreground">Company Profile</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Company name</Label>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Milarch Tech" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Industry</Label>
+          <Select value={industry} onValueChange={setIndustry}>
+            <SelectTrigger><SelectValue placeholder="Select industry" /></SelectTrigger>
+            <SelectContent>
+              {INDUSTRY_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        {saving ? 'Saving…' : 'Save profile'}
+      </Button>
+    </motion.div>
+  );
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const Settings: React.FC = () => {
@@ -268,6 +326,9 @@ const fetchWebhookUrl = async () => {
           Connect and manage your WhatsApp Cloud API credentials
         </p>
       </motion.div>
+
+      {/* ── Company Profile ── */}
+      <CompanyProfileCard />
 
       {/* ══════════════════════════════════════════════════════
           STATUS BANNER
