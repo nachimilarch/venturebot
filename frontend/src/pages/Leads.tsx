@@ -5,6 +5,7 @@ import axios from 'axios';
 import {
   Plus, Search, Filter, MoreHorizontal, Edit, Trash2,
   Phone, Mail, User, Tag, Banknote, RefreshCw,
+  Link, ChevronDown, ChevronUp, Send, Download, CheckCircle2, Loader2,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -201,6 +202,57 @@ const Leads: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData]         = useState<FormState>(EMPTY_FORM);
 
+  // ── IndiaMart panel state ─────────────────────────────────────────────────
+  const [imOpen, setImOpen]                 = useState(false);
+  const [imConfigured, setImConfigured]     = useState(false);
+  const [imLeads, setImLeads]               = useState<any[]>([]);
+  const [imLoading, setImLoading]           = useState(false);
+  const [imSyncing, setImSyncing]           = useState(false);
+  const [imInitiating, setImInitiating]     = useState<string | null>(null);
+  const [imTemplateName, setImTemplateName] = useState('');
+  const [imSelected, setImSelected]         = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    axios.get('/api/indiamart/config').then(({ data }) => setImConfigured(data.configured)).catch(() => {});
+  }, []);
+
+  const fetchImLeads = async () => {
+    setImLoading(true);
+    try {
+      const res = await axios.get('/api/indiamart/leads');
+      if (res.data.success) { setImLeads(res.data.data); setImOpen(true); }
+      else toast.error(res.data.error || 'Failed to fetch IndiaMart leads');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to fetch IndiaMart leads');
+    } finally { setImLoading(false); }
+  };
+
+  const syncImLeads = async () => {
+    const toSync = imLeads.filter(l => imSelected.size === 0 || imSelected.has(l.query_id));
+    if (toSync.length === 0) { toast.error('No leads to sync'); return; }
+    setImSyncing(true);
+    try {
+      const res = await axios.post('/api/indiamart/sync', { leads: toSync });
+      toast.success(`${res.data.imported} lead${res.data.imported !== 1 ? 's' : ''} imported`);
+      setImSelected(new Set());
+      await fetchLeads();
+    } catch { toast.error('Sync failed'); }
+    finally { setImSyncing(false); }
+  };
+
+  const initiateWhatsApp = async (lead: any) => {
+    if (!imTemplateName.trim()) { toast.error('Enter a template name first'); return; }
+    setImInitiating(lead.query_id);
+    try {
+      await axios.post('/api/indiamart/initiate', {
+        phone: lead.phone, name: lead.name, template_name: imTemplateName,
+      });
+      toast.success(`WhatsApp sent to ${lead.name || lead.phone}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to send');
+    } finally { setImInitiating(null); }
+  };
+
   // Stable onChange — does NOT recreate FormFields
   const handleInputChange = useCallback(
     (field: keyof FormState, value: string) =>
@@ -369,6 +421,129 @@ const Leads: React.FC = () => {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* ── IndiaMart Panel ── */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div
+          className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => { if (!imOpen && imLeads.length === 0 && imConfigured) fetchImLeads(); else setImOpen(o => !o); }}
+        >
+          <div className="flex items-center gap-2.5">
+            <Link className="w-4 h-4 text-orange-500" />
+            <span className="font-semibold text-sm">IndiaMart Leads</span>
+            {imConfigured ? (
+              <span className="text-xs bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full">Connected</span>
+            ) : (
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Not configured — go to Settings</span>
+            )}
+            {imLeads.length > 0 && (
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">{imLeads.length} enquiries</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {imConfigured && (
+              <Button size="sm" variant="outline" onClick={e => { e.stopPropagation(); fetchImLeads(); }} disabled={imLoading} className="h-7 text-xs gap-1">
+                {imLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                Fetch
+              </Button>
+            )}
+            {imOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </div>
+        </div>
+
+        {imOpen && imLeads.length > 0 && (
+          <div className="border-t">
+            {/* Toolbar */}
+            <div className="flex items-center gap-3 px-5 py-3 bg-muted/20">
+              <Input
+                placeholder="Template name (e.g. welcome_lead)"
+                value={imTemplateName}
+                onChange={e => setImTemplateName(e.target.value)}
+                className="h-8 text-xs max-w-xs font-mono"
+              />
+              <Button size="sm" onClick={syncImLeads} disabled={imSyncing} className="h-8 text-xs gap-1.5">
+                {imSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                {imSelected.size > 0 ? `Sync ${imSelected.size} selected` : 'Sync all to CRM'}
+              </Button>
+              {imSelected.size > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setImSelected(new Set())} className="h-8 text-xs">
+                  Clear selection
+                </Button>
+              )}
+            </div>
+            {/* Leads table */}
+            <div className="overflow-x-auto max-h-80">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/40 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium w-8">
+                      <input type="checkbox"
+                        checked={imSelected.size === imLeads.length}
+                        onChange={e => setImSelected(e.target.checked ? new Set(imLeads.map(l => l.query_id)) : new Set())}
+                        className="cursor-pointer"
+                      />
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium">Name</th>
+                    <th className="px-3 py-2 text-left font-medium">Phone</th>
+                    <th className="px-3 py-2 text-left font-medium">Product/Query</th>
+                    <th className="px-3 py-2 text-left font-medium">City</th>
+                    <th className="px-3 py-2 text-left font-medium">Received</th>
+                    <th className="px-3 py-2 text-left font-medium w-28">WhatsApp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {imLeads.map(lead => (
+                    <tr key={lead.query_id} className="border-t hover:bg-muted/20 transition-colors">
+                      <td className="px-3 py-2">
+                        <input type="checkbox"
+                          checked={imSelected.has(lead.query_id)}
+                          onChange={e => {
+                            const s = new Set(imSelected);
+                            if (e.target.checked) s.add(lead.query_id); else s.delete(lead.query_id);
+                            setImSelected(s);
+                          }}
+                          className="cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-3 py-2 font-medium">
+                        {lead.name || '—'}
+                        {lead.company && <div className="text-muted-foreground font-normal">{lead.company}</div>}
+                      </td>
+                      <td className="px-3 py-2 font-mono">{lead.phone || '—'}</td>
+                      <td className="px-3 py-2 max-w-[200px] truncate" title={lead.message}>
+                        {lead.product || lead.message || '—'}
+                      </td>
+                      <td className="px-3 py-2">{lead.city || '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {lead.received_at ? new Date(lead.received_at).toLocaleDateString('en-IN') : '—'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Button
+                          size="sm" variant="outline"
+                          className="h-6 text-xs gap-1 px-2"
+                          onClick={() => initiateWhatsApp(lead)}
+                          disabled={!lead.phone || imInitiating === lead.query_id}
+                        >
+                          {imInitiating === lead.query_id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Send className="w-3 h-3" />}
+                          Send
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {imOpen && imLeads.length === 0 && !imLoading && (
+          <div className="border-t px-5 py-8 text-center text-sm text-muted-foreground">
+            {imConfigured ? 'No enquiries found in the last 7 days. Click Fetch to refresh.' : 'Configure your IndiaMart API key in Settings first.'}
+          </div>
+        )}
       </div>
 
       {/* ── Filters ── */}

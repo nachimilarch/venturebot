@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Key, Save, Eye, EyeOff, Copy,
   CheckCircle2, XCircle, Loader2,
-  RefreshCw, Zap, Info, Bell, Clock, FileText, Sparkles,
+  RefreshCw, Zap, Info, Bell, Clock, FileText, Sparkles, Link,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -668,6 +668,9 @@ const fetchWebhookUrl = async () => {
 
       <AiAutoresponderCard />
 
+      {/* ── IndiaMart Integration ─────────────────────────────────────────── */}
+      <IndiaMartCard />
+
       {/* ── Invoice Download ──────────────────────────────────────────────── */}
       <InvoiceCard />
 
@@ -838,11 +841,11 @@ const AiAutoresponderCard: React.FC = () => {
         <Sparkles className="w-5 h-5 text-purple-500" />
         <h2 className="text-lg font-semibold">AI Autoresponder</h2>
         <span className="ml-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 px-2 py-0.5 rounded-full font-medium">
-          Powered by Ollama
+          On-device AI
         </span>
       </div>
       <p className="text-sm text-muted-foreground">
-        When enabled, every inbound WhatsApp message is handled by AI (llama3.2:3b). The AI reads the conversation history and replies automatically — no human agent needed. Each reply uses 1 credit + AI tokens.
+        When enabled, every inbound WhatsApp message is handled by AI. The AI reads the conversation history and replies automatically — no human agent needed. Each reply uses 1 credit + AI tokens.
       </p>
       <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
         <div>
@@ -876,6 +879,133 @@ const AiAutoresponderCard: React.FC = () => {
         <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
           AI is handling all inbound messages. Each reply costs 1 credit + AI tokens. Make sure both balances are topped up in Billing.
         </p>
+      )}
+    </motion.div>
+  );
+};
+
+// ─── IndiaMart Integration Card ───────────────────────────────────────────────
+const IndiaMartCard: React.FC = () => {
+  const [apiKey, setApiKey]           = useState('');
+  const [configured, setConfigured]   = useState(false);
+  const [hint, setHint]               = useState('');
+  const [show, setShow]               = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoTemplate, setAutoTemplate] = useState('');
+  const [savingAuto, setSavingAuto]   = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/indiamart/config').then(({ data }) => {
+      if (data.success) { setConfigured(data.configured); setHint(data.api_key_hint || ''); }
+    }).catch(() => {});
+    axios.get('/api/tenant-settings').then(({ data }) => {
+      setAutoEnabled(data.data?.indiamart_auto_reply_enabled === true || data.data?.indiamart_auto_reply_enabled === 'true');
+      setAutoTemplate(data.data?.indiamart_auto_reply_template ?? '');
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    if (!apiKey.trim()) { toast.error('API key is required'); return; }
+    setSaving(true);
+    try {
+      await axios.put('/api/indiamart/config', { api_key: apiKey.trim() });
+      setConfigured(true); setHint(`${apiKey.slice(0, 4)}****`); setApiKey('');
+      toast.success('IndiaMart API key saved');
+    } catch { toast.error('Save failed'); }
+    finally { setSaving(false); }
+  };
+
+  const toggleAuto = async (val: boolean) => {
+    setAutoEnabled(val);
+    try {
+      await axios.put('/api/tenant-settings/indiamart_auto_reply_enabled', { value: val ? 'true' : 'false' });
+      toast.success(val ? 'Auto-reply enabled — polls every 15 min' : 'Auto-reply disabled');
+    } catch { setAutoEnabled(!val); toast.error('Save failed'); }
+  };
+
+  const saveAutoTemplate = async () => {
+    if (!autoTemplate.trim()) { toast.error('Template name is required'); return; }
+    setSavingAuto(true);
+    try {
+      await axios.put('/api/tenant-settings/indiamart_auto_reply_template', { value: autoTemplate.trim() });
+      toast.success('Auto-reply template saved');
+    } catch { toast.error('Save failed'); }
+    finally { setSavingAuto(false); }
+  };
+
+  return (
+    <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.32 }}
+      className="rounded-2xl border bg-card shadow-sm p-6 space-y-5">
+      <div className="flex items-center gap-2">
+        <Link className="w-5 h-5 text-orange-500" />
+        <h2 className="text-lg font-semibold">IndiaMart Integration</h2>
+        {configured && (
+          <span className="ml-1 text-xs bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Connected
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Connect your IndiaMart account to pull buyer enquiries as leads and send WhatsApp messages instantly.
+        Find your GLUSR CRM key in your IndiaMart seller dashboard under <strong>CRM → API Key</strong>.
+      </p>
+
+      {/* ── API Key ── */}
+      {configured && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-950/30 rounded-lg text-sm text-green-700 dark:text-green-300">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          API key saved — <code className="font-mono text-xs">{hint}</code>
+          <span className="text-muted-foreground ml-1">· Update below to rotate</span>
+        </div>
+      )}
+      <div className="space-y-1.5 max-w-md">
+        <Label>{configured ? 'Update API key' : 'GLUSR CRM Key'}</Label>
+        <div className="flex gap-2">
+          <Input type={show ? 'text' : 'password'} value={apiKey} onChange={e => setApiKey(e.target.value)}
+            placeholder={configured ? 'Enter new key to rotate' : 'Paste your GLUSR CRM key here'}
+            className="font-mono" />
+          <Button variant="outline" size="icon" onClick={() => setShow(s => !s)} type="button">
+            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </Button>
+        </div>
+      </div>
+      <Button size="sm" onClick={save} disabled={saving || !apiKey.trim()} className="gap-1.5">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        {saving ? 'Saving…' : 'Save key'}
+      </Button>
+
+      {/* ── Auto-reply ── */}
+      {configured && (
+        <div className="border-t pt-5 space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+            <div>
+              <p className="font-medium text-sm">Auto-reply to new leads</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Every 15 minutes, new IndiaMart enquiries automatically get a WhatsApp template message
+              </p>
+            </div>
+            <Switch checked={autoEnabled} onCheckedChange={toggleAuto} />
+          </div>
+          <div className="space-y-1.5 max-w-md">
+            <Label>WhatsApp template name
+              <FieldHint text="The approved template to send automatically. Must exist in your Meta WABA account. Example: welcome_lead" />
+            </Label>
+            <div className="flex gap-2">
+              <Input value={autoTemplate} onChange={e => setAutoTemplate(e.target.value)}
+                placeholder="e.g. welcome_lead" className="font-mono" />
+              <Button size="sm" onClick={saveAutoTemplate} disabled={savingAuto || !autoTemplate.trim()} className="gap-1.5 shrink-0">
+                {savingAuto ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save
+              </Button>
+            </div>
+          </div>
+          {autoEnabled && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
+              Auto-reply is active. New enquiries are checked every 15 minutes. Each message uses 1 credit.
+            </p>
+          )}
+        </div>
       )}
     </motion.div>
   );

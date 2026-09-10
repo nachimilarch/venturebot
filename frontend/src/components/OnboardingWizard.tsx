@@ -111,7 +111,7 @@ const STEPS: Step[] = [
     id: 'ai', icon: <Sparkles className="w-5 h-5" />,
     color: '262 83% 58%',
     title: 'Explore AI features',
-    subtitle: 'Every page has AI-powered shortcuts — powered by local Ollama, no API cost.',
+    subtitle: 'Every page has AI-powered shortcuts — runs on-device, no external API cost.',
     bullets: [
       'Inbox: "Suggest replies" based on conversation',
       'Contacts: "AI Summary" of engagement and intent',
