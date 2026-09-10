@@ -24,7 +24,7 @@ async function recordAiTokenUsage(tenantId, feature, inputTokens, outputTokens, 
   await pool.execute(
     `INSERT INTO ai_usage_logs
        (tenant_id, feature, model, input_tokens, output_tokens, total_tokens, cached, created_at)
-     VALUES (?, ?, 'llama3.2:3b', ?, ?, ?, ?, NOW())`,
+     VALUES (?, ?, 'vaartabot-ai', ?, ?, ?, ?, NOW())`,
     [tenantId, feature, inputTokens, outputTokens, total, cached ? 1 : 0]
   );
   if (total > 0 && !cached) {
@@ -47,8 +47,8 @@ router.get('/token-usage', async (req, res) => {
     );
     const balance = Number(tenant?.ai_tokens_balance ?? 0);
 
-    // Today's usage from in-memory counter (session)
-    const tokensToday = getDailyTokensUsed(tenantId);
+    // Today's usage from DB-backed counter
+    const tokensToday = await getDailyTokensUsed(tenantId);
 
     // DB: this month per-feature
     const [byFeature] = await pool.execute(

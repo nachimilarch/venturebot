@@ -358,10 +358,17 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
     );
     if (!setting || setting.value !== 'true') return false;
 
-    // If session is in a structured booking state, let the flow engine handle it
+    // If session is in a structured booking state:
+    // - short/structured inputs (selections, button IDs) → let booking flow handle
+    // - longer natural-language messages → reset session, let AI respond
     const session = await getOrCreateSession(from);
     const BOOKING_STATES = new Set(['BOOK_TYPE', 'BOOK_SLOT', 'BOOK_CONFIRM', 'MY_APPTS', 'CANCEL_CONFIRM']);
-    if (BOOKING_STATES.has(session.state)) return false;
+    if (BOOKING_STATES.has(session.state)) {
+      const wordCount = userInput.trim().split(/\s+/).length;
+      const isStructuredInput = wordCount <= 3 || userInput.startsWith('menu_') || userInput.startsWith('confirm_');
+      if (isStructuredInput) return false;
+      await resetSession(from); // Free-form question mid-booking — reset & let AI handle
+    }
 
     // Check credits
     const [[creditRow]] = await pool.execute(
@@ -479,7 +486,7 @@ If you don't know something about the business, say "I'll connect you with our t
       if (totalTokens > 0) {
         await pool.execute(
           `INSERT INTO ai_usage_logs (tenant_id, feature, model, input_tokens, output_tokens, total_tokens, cached, created_at)
-           VALUES (?, 'autoresponder', 'llama3.2:3b', ?, ?, ?, 0, NOW())`,
+           VALUES (?, 'autoresponder', 'vaartabot-ai', ?, ?, ?, 0, NOW())`,
           [tenantId, inputTokens, outputTokens, totalTokens]
         ).catch(() => {});
         await pool.execute(
