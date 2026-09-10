@@ -127,6 +127,56 @@ router.post('/cashfree/webhook', express.raw({ type: '*/*' }), async (req, res) 
   }
 });
 
+// ─── POST /api/payments/payu/webhook — surl/furl called by PayU server (no auth)
+
+router.post('/payu/webhook', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const body = req.body;
+    const { txnid, status, hash: receivedHash, mihpayid = '' } = body;
+    const key  = process.env.PAYU_KEY  || '';
+    const salt = process.env.PAYU_SALT || '';
+
+    const expectedHash = payuReverseHash(body, salt, key);
+    if (receivedHash !== expectedHash) {
+      console.warn(`[PayU:webhook] ❌ Hash mismatch txnid:${txnid}`);
+      return res.status(400).send('Invalid signature');
+    }
+
+    console.log(`[PayU:webhook] ${status} | txnid:${txnid} | mihpayid:${mihpayid}`);
+
+    if (status === 'success') {
+      const [[txn]] = await pool.execute(
+        'SELECT * FROM transactions WHERE transaction_ref = ? LIMIT 1', [txnid]
+      );
+      if (txn && txn.status !== 'completed') {
+        await pool.execute(
+          'UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
+          [mihpayid, txnid]
+        );
+        if (txn.type === 'ai_token_purchase') {
+          await pool.execute('UPDATE tenants SET ai_tokens_balance = ai_tokens_balance + ? WHERE id = ?', [txn.credits, txn.tenant_id]);
+          console.log(`[PayU:webhook] ✅ AI tokens +${txn.credits} → tenant ${txn.tenant_id}`);
+        } else {
+          await pool.execute('UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?', [txn.credits, txn.tenant_id]);
+          console.log(`[PayU:webhook] ✅ Credits +${txn.credits} → tenant ${txn.tenant_id}`);
+        }
+      } else if (txn?.status === 'completed') {
+        console.log(`[PayU:webhook] ℹ️  Already processed: ${txnid}`);
+      }
+    } else {
+      await pool.execute(
+        'UPDATE transactions SET status = "failed", updated_at = NOW() WHERE transaction_ref = ?', [txnid]
+      );
+      console.log(`[PayU:webhook] ❌ Failed: ${txnid}`);
+    }
+
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('[PayU:webhook]', err.message);
+    res.status(500).send('Error');
+  }
+});
+
 // ─── Auth required for all routes below ──────────────────────────────────────
 
 router.use(authMiddleware);
@@ -404,6 +454,224 @@ router.post('/verify-ai', async (req, res) => {
     res.json({ success: false, status: data.order_status });
   } catch (err) {
     console.error('[Cashfree:verify-ai]', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'Verification failed' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PayU Payment Gateway
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const getPayUVerifyURL = () =>
+  (process.env.PAYU_ENV || 'PROD') === 'PROD'
+    ? 'https://info.payu.in/merchant/postservice.php?form=2'
+    : 'https://test.payu.in/merchant/postservice.php?form=2';
+
+// sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT)
+function payuForwardHash(key, txnid, amount, productinfo, firstname, email, salt) {
+  const parts = [key, txnid, amount, productinfo, firstname, email, '', '', '', '', '', '', '', '', '', '', salt];
+  return crypto.createHash('sha512').update(parts.join('|')).digest('hex');
+}
+
+// Reverse hash for webhook signature verification
+// sha512(SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|KEY)
+function payuReverseHash({ status, txnid, amount, productinfo, firstname, email, udf1 = '', udf2 = '', udf3 = '', udf4 = '', udf5 = '' }, salt, key) {
+  const str = `${salt}|${status}||||||${udf5}|${udf4}|${udf3}|${udf2}|${udf1}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
+  return crypto.createHash('sha512').update(str).digest('hex');
+}
+
+// sha512(SALT|command|var1|KEY)
+function payuVerifyHash(salt, txnid, key) {
+  return crypto.createHash('sha512').update(`${salt}|verify_payment|${txnid}|${key}`).digest('hex');
+}
+
+async function getPayUTenantDetails(tenantId) {
+  const [[tenant]] = await pool.execute(
+    `SELECT t.name, u.email,
+            REGEXP_REPLACE(wc.display_phone_number, '[^0-9]', '') AS phone
+       FROM tenants t
+       LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'admin'
+       LEFT JOIN whatsapp_config wc ON wc.tenant_id = t.id AND wc.is_active = 1
+      WHERE t.id = ? LIMIT 1`,
+    [tenantId]
+  );
+  const rawPhone = tenant?.phone || '';
+  const phone = (rawPhone.length >= 10 ? rawPhone.slice(-10) : rawPhone) || '9999999999';
+  return {
+    firstname: (tenant?.name || 'VaartaBot User').split(' ')[0],
+    email: tenant?.email || 'noreply@vaartabot.in',
+    phone,
+  };
+}
+
+// ─── POST /api/payments/payu/create-order ─────────────────────────────────────
+
+router.post('/payu/create-order', async (req, res) => {
+  try {
+    const { packageId } = req.body;
+    const pkg = CREDIT_PACKAGES[packageId];
+    if (!pkg) return res.status(400).json({ success: false, error: 'Invalid package' });
+
+    const tenantId = req.user.tenantId;
+    const txnid    = `VB_${tenantId}_${Date.now()}`;
+    const amount   = pkg.price.toFixed(2);
+    const key      = process.env.PAYU_KEY  || '';
+    const salt     = process.env.PAYU_SALT || '';
+
+    const { firstname, email, phone } = await getPayUTenantDetails(tenantId);
+    const productinfo = `${pkg.name} — ${pkg.credits} credits`;
+
+    const BACKEND  = (process.env.BACKEND_URL || 'https://api.vaartabot.com').replace(/\/$/, '');
+    const surl     = `${BACKEND}/api/payments/payu/webhook`;
+    const furl     = `${BACKEND}/api/payments/payu/webhook`;
+    const hash     = payuForwardHash(key, txnid, amount, productinfo, firstname, email, salt);
+
+    await pool.execute(
+      `INSERT INTO transactions (tenant_id, type, amount, credits, description, status, transaction_ref, created_at)
+       VALUES (?, 'purchase', ?, ?, ?, 'pending', ?, NOW())`,
+      [tenantId, pkg.price, pkg.credits, productinfo, txnid]
+    );
+
+    console.log(`[PayU] 🆕 Order: ${txnid} | tenant:${tenantId} | ₹${pkg.price}`);
+
+    res.json({ success: true, txnid, hash, key, amount, productinfo, firstname, email, phone, surl, furl, packageInfo: pkg });
+  } catch (err) {
+    console.error('[PayU:create-order]', err.message);
+    res.status(500).json({ success: false, error: 'Failed to create order' });
+  }
+});
+
+// ─── POST /api/payments/payu/verify ──────────────────────────────────────────
+
+router.post('/payu/verify', async (req, res) => {
+  try {
+    const { txnid } = req.body;
+    const tenantId  = req.user.tenantId;
+    const key       = process.env.PAYU_KEY  || '';
+    const salt      = process.env.PAYU_SALT || '';
+
+    const verifyHash = payuVerifyHash(salt, txnid, key);
+    const { data } = await axios.post(
+      getPayUVerifyURL(),
+      new URLSearchParams({ key, command: 'verify_payment', var1: txnid, hash: verifyHash }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const txnDetails = data?.transaction_details?.[txnid];
+    const payuStatus = txnDetails?.status;
+    const mihpayid   = txnDetails?.mihpayid || '';
+
+    console.log(`[PayU:verify] txnid:${txnid} status:${payuStatus}`);
+
+    if (payuStatus === 'success') {
+      const [[txn]] = await pool.execute(
+        'SELECT * FROM transactions WHERE transaction_ref = ? AND tenant_id = ? LIMIT 1',
+        [txnid, tenantId]
+      );
+      if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
+
+      if (txn.status === 'completed') {
+        const [[t]] = await pool.execute('SELECT credits_balance FROM tenants WHERE id = ?', [tenantId]);
+        return res.json({ success: true, creditsAdded: txn.credits, newBalance: t.credits_balance, alreadyProcessed: true });
+      }
+
+      await pool.execute('UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?', [mihpayid, txnid]);
+      await pool.execute('UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?', [txn.credits, tenantId]);
+      const [[t]] = await pool.execute('SELECT credits_balance FROM tenants WHERE id = ?', [tenantId]);
+
+      console.log(`[PayU:verify] ✅ Credits +${txn.credits} → tenant ${tenantId}`);
+      return res.json({ success: true, creditsAdded: txn.credits, newBalance: t.credits_balance });
+    }
+
+    res.json({ success: false, status: payuStatus || 'unknown' });
+  } catch (err) {
+    console.error('[PayU:verify]', err.response?.data || err.message);
+    res.status(500).json({ success: false, error: 'Verification failed' });
+  }
+});
+
+// ─── POST /api/payments/payu/create-ai-order ─────────────────────────────────
+
+router.post('/payu/create-ai-order', async (req, res) => {
+  try {
+    const { packageId } = req.body;
+    const pkg = AI_TOKEN_PACKAGES[packageId];
+    if (!pkg) return res.status(400).json({ success: false, error: 'Invalid AI token package' });
+
+    const tenantId = req.user.tenantId;
+    const txnid    = `VBAI_${tenantId}_${Date.now()}`;
+    const amount   = pkg.price.toFixed(2);
+    const key      = process.env.PAYU_KEY  || '';
+    const salt     = process.env.PAYU_SALT || '';
+
+    const { firstname, email, phone } = await getPayUTenantDetails(tenantId);
+    const productinfo = `${pkg.name} — ${pkg.tokens.toLocaleString()} AI tokens`;
+
+    const BACKEND  = (process.env.BACKEND_URL || 'https://api.vaartabot.com').replace(/\/$/, '');
+    const surl     = `${BACKEND}/api/payments/payu/webhook`;
+    const furl     = `${BACKEND}/api/payments/payu/webhook`;
+    const hash     = payuForwardHash(key, txnid, amount, productinfo, firstname, email, salt);
+
+    await pool.execute(
+      `INSERT INTO transactions (tenant_id, type, amount, credits, description, status, transaction_ref, created_at)
+       VALUES (?, 'ai_token_purchase', ?, ?, ?, 'pending', ?, NOW())`,
+      [tenantId, pkg.price, pkg.tokens, productinfo, txnid]
+    );
+
+    console.log(`[PayU] 🤖 AI order: ${txnid} | tenant:${tenantId} | ₹${pkg.price}`);
+
+    res.json({ success: true, txnid, hash, key, amount, productinfo, firstname, email, phone, surl, furl, packageInfo: pkg });
+  } catch (err) {
+    console.error('[PayU:create-ai-order]', err.message);
+    res.status(500).json({ success: false, error: 'Failed to create AI token order' });
+  }
+});
+
+// ─── POST /api/payments/payu/verify-ai ───────────────────────────────────────
+
+router.post('/payu/verify-ai', async (req, res) => {
+  try {
+    const { txnid } = req.body;
+    const tenantId  = req.user.tenantId;
+    const key       = process.env.PAYU_KEY  || '';
+    const salt      = process.env.PAYU_SALT || '';
+
+    const verifyHash = payuVerifyHash(salt, txnid, key);
+    const { data } = await axios.post(
+      getPayUVerifyURL(),
+      new URLSearchParams({ key, command: 'verify_payment', var1: txnid, hash: verifyHash }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const txnDetails = data?.transaction_details?.[txnid];
+    const payuStatus = txnDetails?.status;
+    const mihpayid   = txnDetails?.mihpayid || '';
+
+    console.log(`[PayU:verify-ai] txnid:${txnid} status:${payuStatus}`);
+
+    if (payuStatus === 'success') {
+      const [[txn]] = await pool.execute(
+        'SELECT * FROM transactions WHERE transaction_ref = ? AND tenant_id = ? LIMIT 1',
+        [txnid, tenantId]
+      );
+      if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
+
+      if (txn.status === 'completed') {
+        const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
+        return res.json({ success: true, tokensAdded: txn.credits, newBalance: t.ai_tokens_balance, alreadyProcessed: true });
+      }
+
+      await pool.execute('UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?', [mihpayid, txnid]);
+      await pool.execute('UPDATE tenants SET ai_tokens_balance = ai_tokens_balance + ? WHERE id = ?', [txn.credits, tenantId]);
+      const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
+
+      console.log(`[PayU:verify-ai] ✅ AI tokens +${txn.credits} → tenant ${tenantId}`);
+      return res.json({ success: true, tokensAdded: txn.credits, newBalance: t.ai_tokens_balance });
+    }
+
+    res.json({ success: false, status: payuStatus || 'unknown' });
+  } catch (err) {
+    console.error('[PayU:verify-ai]', err.response?.data || err.message);
     res.status(500).json({ success: false, error: 'Verification failed' });
   }
 });
