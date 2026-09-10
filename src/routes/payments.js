@@ -24,7 +24,7 @@ const getCFHeaders = () => ({
 // ─── Credit Packages ──────────────────────────────────────────────────────────
 
 const CREDIT_PACKAGES = {
-  1: { credits: 500,   price: 999,   name: 'Starter'    },
+1: { credits: 500,   price: 999,   name: 'Starter'    },
   2: { credits: 2000,  price: 3499,  name: 'Basic'      },
   3: { credits: 5000,  price: 8499,  name: 'Growth'     },
   4: { credits: 15000, price: 23999, name: 'Pro'        },
@@ -174,6 +174,51 @@ router.post('/payu/webhook', express.urlencoded({ extended: false }), async (req
   } catch (err) {
     console.error('[PayU:webhook]', err.message);
     res.status(500).send('Error');
+  }
+});
+
+// ─── POST /api/payments/payu/return — browser redirect from PayU after payment
+// PayU POSTs here from the user's browser; we credit (failsafe) then redirect.
+
+router.post('/payu/return', express.urlencoded({ extended: false }), async (req, res) => {
+  const FRONTEND = process.env.FRONTEND_URL || 'https://vaartabot.com';
+  const body = req.body;
+  const { txnid, status, hash: receivedHash, mihpayid = '' } = body;
+  const key  = process.env.PAYU_KEY  || '';
+  const salt = process.env.PAYU_SALT || '';
+
+  try {
+    const expectedHash = payuReverseHash(body, salt, key);
+    if (receivedHash !== expectedHash) {
+      console.warn(`[PayU:return] ❌ Hash mismatch txnid:${txnid}`);
+      return res.redirect(`${FRONTEND}/billing?payment=failed&reason=hash`);
+    }
+
+    if (status === 'success') {
+      const [[txn]] = await pool.execute(
+        'SELECT * FROM transactions WHERE transaction_ref = ? LIMIT 1', [txnid]
+      );
+      if (txn && txn.status !== 'completed') {
+        await pool.execute(
+          'UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
+          [mihpayid, txnid]
+        );
+        if (txn.type === 'ai_token_purchase') {
+          await pool.execute('UPDATE tenants SET ai_tokens_balance = ai_tokens_balance + ? WHERE id = ?', [txn.credits, txn.tenant_id]);
+        } else {
+          await pool.execute('UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?', [txn.credits, txn.tenant_id]);
+        }
+      }
+      return res.redirect(`${FRONTEND}/billing?payment=success`);
+    } else {
+      await pool.execute(
+        'UPDATE transactions SET status = "failed", updated_at = NOW() WHERE transaction_ref = ?', [txnid]
+      );
+      return res.redirect(`${FRONTEND}/billing?payment=failed`);
+    }
+  } catch (err) {
+    console.error('[PayU:return]', err.message);
+    return res.redirect(`${FRONTEND}/billing?payment=failed`);
   }
 });
 
@@ -521,9 +566,9 @@ router.post('/payu/create-order', async (req, res) => {
     const { firstname, email, phone } = await getPayUTenantDetails(tenantId);
     const productinfo = `${pkg.name} — ${pkg.credits} credits`;
 
-    const BACKEND  = (process.env.BACKEND_URL || 'https://api.vaartabot.com').replace(/\/$/, '');
-    const surl     = `${BACKEND}/api/payments/payu/webhook`;
-    const furl     = `${BACKEND}/api/payments/payu/webhook`;
+    const BACKEND  = (process.env.BACKEND_URL || 'https://vaartabot.com').replace(/\/$/, '');
+    const surl     = `${BACKEND}/api/payments/payu/return`;
+    const furl     = `${BACKEND}/api/payments/payu/return`;
     const hash     = payuForwardHash(key, txnid, amount, productinfo, firstname, email, salt);
 
     await pool.execute(
@@ -607,9 +652,9 @@ router.post('/payu/create-ai-order', async (req, res) => {
     const { firstname, email, phone } = await getPayUTenantDetails(tenantId);
     const productinfo = `${pkg.name} — ${pkg.tokens.toLocaleString()} AI tokens`;
 
-    const BACKEND  = (process.env.BACKEND_URL || 'https://api.vaartabot.com').replace(/\/$/, '');
-    const surl     = `${BACKEND}/api/payments/payu/webhook`;
-    const furl     = `${BACKEND}/api/payments/payu/webhook`;
+    const BACKEND  = (process.env.BACKEND_URL || 'https://vaartabot.com').replace(/\/$/, '');
+    const surl     = `${BACKEND}/api/payments/payu/return`;
+    const furl     = `${BACKEND}/api/payments/payu/return`;
     const hash     = payuForwardHash(key, txnid, amount, productinfo, firstname, email, salt);
 
     await pool.execute(
