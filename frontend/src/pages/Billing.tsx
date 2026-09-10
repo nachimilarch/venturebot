@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 declare global {
-  interface Window { Cashfree: any; }
+  interface Window { bolt: any; }
 }
 
 const creditPackages = [
@@ -39,14 +39,31 @@ const aiTokenPackages = [
   { id: 4, tokens: 10_000_000, label: 'AI Pro',     icon: Crown,    price: 14999 },
 ];
 
-const loadCashfreeSDK = (): Promise<void> =>
+const PAYU_ENV = import.meta.env.VITE_PAYU_ENV || 'PROD';
+
+const loadPayUBolt = (): Promise<void> =>
   new Promise((resolve, reject) => {
-    if (window.Cashfree) return resolve();
+    if (window.bolt) return resolve();
+    // Remove any stale bolt script (env switch)
+    document.getElementById('bolt')?.remove();
     const script = document.createElement('script');
-    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.id = 'bolt';
+    script.src = PAYU_ENV === 'TEST'
+      ? 'https://sboxcheckout-static.citruspay.com/bolt/run/bolt.min.js'
+      : 'https://checkout-static.payu.in/bolt/run/bolt.min.js';
+    script.setAttribute('bolt-color', '');
+    script.setAttribute('bolt-logo', '');
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Cashfree SDK'));
+    script.onerror = () => reject(new Error('Failed to load PayU Bolt SDK'));
     document.head.appendChild(script);
+  });
+
+const launchPayUBolt = (params: Record<string, string>): Promise<any> =>
+  new Promise((resolve, reject) => {
+    window.bolt.launch(params, {
+      responseHandler: (BOLT: any) => resolve(BOLT.response),
+      catchException:  (BOLT: any) => reject(new Error(BOLT?.message || 'PayU error')),
+    });
   });
 
 interface AiTokenUsage {
@@ -88,7 +105,7 @@ const Billing: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPeriod, setFilterPeriod] = useState('all');
 
-  useEffect(() => { loadCashfreeSDK().catch(console.error); }, []);
+  useEffect(() => { loadPayUBolt().catch(console.error); }, []);
 
   const refreshBilling = async (silent = true) => {
     if (!silent) setIsRefreshing(true);
@@ -118,56 +135,36 @@ const Billing: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const { data } = await api.post('/api/payments/create-order', { packageId: pkg.id });
+      await loadPayUBolt();
+
+      const { data } = await api.post('/api/payments/payu/create-order', { packageId: pkg.id });
       if (!data.success) throw new Error(data.error || 'Order creation failed');
 
-      const { paymentSessionId, orderId } = data;
+      const { txnid, hash, key, amount, productinfo, firstname, email, phone, surl, furl } = data;
 
-      await loadCashfreeSDK();
-
-      // ✅ Close Dialog BEFORE opening Cashfree modal
       setIsPaymentOpen(false);
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Small delay to let Dialog unmount fully
-      await new Promise(resolve => setTimeout(resolve, 350));
-
-      const cashfree = window.Cashfree({
-        mode: import.meta.env.VITE_CASHFREE_ENV === 'TEST' ? 'sandbox' : 'production',
-      });
-
-      const checkoutPromise = cashfree.checkout({
-        paymentSessionId,
-        redirectTarget: '_modal',
-      });
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 10 * 60 * 1000)
-      );
-
-      let result: any;
+      let response: any;
       try {
-        result = await Promise.race([checkoutPromise, timeoutPromise]);
+        response = await launchPayUBolt({ key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash });
       } catch (err: any) {
-        toast.error(err.message === 'timeout' ? 'Payment session expired.' : 'Payment was cancelled.');
+        toast.error(err.message || 'Payment was cancelled.');
         setIsProcessing(false);
         return;
       }
 
-      if (result?.error) {
-        toast.error(result.error.message || 'Payment failed. Please try again.');
+      if (response?.txnStatus !== 'SUCCESS') {
+        toast.error('Payment failed. Please try again.');
         setIsProcessing(false);
         return;
       }
 
-      if (result?.redirect) return;
-
-      // Verify
-      const verifyRes = await api.post('/api/payments/verify', { orderId });
+      const verifyRes = await api.post('/api/payments/payu/verify', { txnid });
       if (verifyRes.data?.success) {
         toast.success(`🎉 ${pkg.credits.toLocaleString()} credits added!`);
         await refreshBilling();
-        // Re-open dialog to show success state
-        setPaymentSuccess({ credits: pkg.credits, orderId });
+        setPaymentSuccess({ credits: pkg.credits, orderId: txnid });
         setIsPaymentOpen(true);
       } else {
         toast.error('Verification failed. Contact support.');
@@ -199,47 +196,36 @@ const Billing: React.FC = () => {
     setIsAiProcessing(true);
 
     try {
-      const { data } = await api.post('/api/payments/create-ai-order', { packageId: pkg.id });
+      await loadPayUBolt();
+
+      const { data } = await api.post('/api/payments/payu/create-ai-order', { packageId: pkg.id });
       if (!data.success) throw new Error(data.error || 'Order creation failed');
 
-      const { paymentSessionId, orderId } = data;
-
-      await loadCashfreeSDK();
+      const { txnid, hash, key, amount, productinfo, firstname, email, phone, surl, furl } = data;
 
       setIsAiPaymentOpen(false);
-      await new Promise(resolve => setTimeout(resolve, 350));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      const cashfree = window.Cashfree({
-        mode: import.meta.env.VITE_CASHFREE_ENV === 'TEST' ? 'sandbox' : 'production',
-      });
-
-      const checkoutPromise = cashfree.checkout({ paymentSessionId, redirectTarget: '_modal' });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 10 * 60 * 1000)
-      );
-
-      let result: any;
+      let response: any;
       try {
-        result = await Promise.race([checkoutPromise, timeoutPromise]);
+        response = await launchPayUBolt({ key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash });
       } catch (err: any) {
-        toast.error(err.message === 'timeout' ? 'Payment session expired.' : 'Payment was cancelled.');
+        toast.error(err.message || 'Payment was cancelled.');
         setIsAiProcessing(false);
         return;
       }
 
-      if (result?.error) {
-        toast.error(result.error.message || 'Payment failed. Please try again.');
+      if (response?.txnStatus !== 'SUCCESS') {
+        toast.error('Payment failed. Please try again.');
         setIsAiProcessing(false);
         return;
       }
 
-      if (result?.redirect) return;
-
-      const verifyRes = await api.post('/api/payments/verify-ai', { orderId });
+      const verifyRes = await api.post('/api/payments/payu/verify-ai', { txnid });
       if (verifyRes.data?.success) {
         toast.success(`🤖 ${pkg.tokens.toLocaleString()} AI tokens added!`);
         await refreshBilling();
-        setAiPaymentSuccess({ tokens: pkg.tokens, orderId });
+        setAiPaymentSuccess({ tokens: pkg.tokens, orderId: txnid });
         setIsAiPaymentOpen(true);
       } else {
         toast.error('Verification failed. Contact support.');
@@ -355,7 +341,7 @@ const Billing: React.FC = () => {
             <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 overflow-hidden">
               <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
                 <DialogTitle className="text-sm font-semibold text-foreground">Buy Message Credits</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Instant delivery · Secure payment via Cashfree</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Instant delivery · Secure payment via PayU</p>
               </DialogHeader>
 
               {/* Success state */}
@@ -430,7 +416,7 @@ const Billing: React.FC = () => {
                     {/* Trust badges */}
                     <div className="flex items-center justify-center gap-4 pt-1">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="w-3 h-3" /> Secure Payment</div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="w-3 h-3" /> Cashfree Encrypted</div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="w-3 h-3" /> PayU Secured</div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Zap className="w-3 h-3" /> Instant Credits</div>
                     </div>
                   </div>
@@ -543,7 +529,7 @@ const Billing: React.FC = () => {
             <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 overflow-hidden">
               <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
                 <DialogTitle className="text-sm font-semibold text-foreground">Buy AI Tokens</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Powers AI features · Charged per token · Secure via Cashfree</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Powers AI features · Charged per token · Secure via PayU</p>
               </DialogHeader>
 
               {aiPaymentSuccess ? (
@@ -615,7 +601,7 @@ const Billing: React.FC = () => {
 
                     <div className="flex items-center justify-center gap-4 pt-1">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="w-3 h-3" /> Secure Payment</div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="w-3 h-3" /> Cashfree Encrypted</div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="w-3 h-3" /> PayU Secured</div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Zap className="w-3 h-3" /> Instant Tokens</div>
                     </div>
                   </div>
