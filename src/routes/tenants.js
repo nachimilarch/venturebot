@@ -39,11 +39,12 @@ router.get('/', async (req, res) => {
 // Update tenant information (admin only)
 router.put('/', roleMiddleware(['admin']), async (req, res) => {
   try {
-    const { name, industry, phone, address } = req.body;
+    const { name, industry } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
 
     await pool.execute(
-      'UPDATE tenants SET name = ?, industry = ?, phone = ?, address = ? WHERE id = ?',
-      [name, industry, phone, address, req.user.tenantId]
+      'UPDATE tenants SET name = ?, industry = ? WHERE id = ?',
+      [name.trim(), industry || null, req.user.tenantId]
     );
 
     res.json({ success: true, message: 'Tenant information updated successfully' });
