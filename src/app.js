@@ -41,8 +41,10 @@ import dripRouter from './routes/drip.js';
 import onboardingRouter from './routes/onboarding.js';
 import aiRouter from './routes/ai.js';
 import templatesRouter from './routes/templates.js';
+import indiamartRouter from './routes/indiamart.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
 import { startDripScheduler } from './services/dripScheduler.js';
+import { startIndiamartScheduler } from './services/indiamartScheduler.js';
 
 import * as logger from './utils/logger.js';
 const log = logger.log || console.log;
@@ -120,6 +122,9 @@ app.use('/api/ai', aiRouter);
 // WhatsApp template management (JWT-protected, dashboard-facing)
 app.use('/api/templates', templatesRouter);
 
+// IndiaMart lead integration (JWT-protected, dashboard-facing)
+app.use('/api/indiamart', indiamartRouter);
+
 // CRM Integration API v1 (API-key-protected)
 app.use('/api/v1/credits',   v1CreditsRouter);
 app.use('/api/v1/messages',  v1MessagesRouter);
@@ -140,4 +145,5 @@ app.listen(port, () => {
   log(`🚀 Server listening on port ${port}`);
   startCampaignScheduler();
   startDripScheduler();
+  startIndiamartScheduler();
 });
