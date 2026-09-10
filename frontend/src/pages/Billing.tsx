@@ -208,6 +208,7 @@ const Billing: React.FC = () => {
           !txn.transaction_ref?.toLowerCase().includes(q)
         ) return false;
       }
+      if (txn.status === 'pending') return false;
       if (filterType !== 'all' && txn.type !== filterType) return false;
       if (filterStatus !== 'all' && txn.status !== filterStatus) return false;
       if (filterPeriod !== 'all') {
@@ -242,11 +243,17 @@ const Billing: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-700';
-      case 'pending': return 'bg-yellow-100 text-yellow-700';
-      case 'failed': return 'bg-red-100 text-red-700';
+      case 'paid':
+      case 'completed': return 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400';
+      case 'failed': return 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400';
       default: return 'bg-muted text-muted-foreground';
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (status === 'paid' || status === 'completed') return 'Paid';
+    if (status === 'failed') return 'Failed';
+    return status;
   };
 
   const currentBalance = liveBalance ?? dashboardStats?.credits ?? 0;
@@ -705,8 +712,7 @@ const Billing: React.FC = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
             </SelectContent>
           </Select>
@@ -781,8 +787,8 @@ const Billing: React.FC = () => {
                         ₹{Math.abs(txn.amount).toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn('text-xs font-medium rounded-full px-2.5 py-1 capitalize', getStatusBadge(txn.status))}>
-                          {txn.status}
+                        <span className={cn('text-xs font-medium rounded-full px-2.5 py-1', getStatusBadge(txn.status))}>
+                          {getStatusLabel(txn.status)}
                         </span>
                       </td>
                     </tr>
