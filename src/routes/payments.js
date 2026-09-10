@@ -86,9 +86,9 @@ router.post('/cashfree/webhook', express.raw({ type: '*/*' }), async (req, res) 
         [orderId]
       );
 
-      if (txn && txn.status !== 'completed') {
+      if (txn && txn.status !== 'paid') {
         await pool.execute(
-          'UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
+          'UPDATE transactions SET status = "paid", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
           [paymentId, orderId]
         );
         if (txn.type === 'ai_token_purchase') {
@@ -104,7 +104,7 @@ router.post('/cashfree/webhook', express.raw({ type: '*/*' }), async (req, res) 
           );
           console.log(`[Cashfree:webhook] ✅ Credited ${txn.credits} to tenant ${txn.tenant_id}`);
         }
-      } else if (txn?.status === 'completed') {
+      } else if (txn?.status === 'paid') {
         console.log(`[Cashfree:webhook] ℹ️  Already processed: ${orderId}`);
       } else {
         console.warn(`[Cashfree:webhook] ⚠️  Transaction not found: ${orderId}`);
@@ -148,9 +148,9 @@ router.post('/payu/webhook', express.urlencoded({ extended: false }), async (req
       const [[txn]] = await pool.execute(
         'SELECT * FROM transactions WHERE transaction_ref = ? LIMIT 1', [txnid]
       );
-      if (txn && txn.status !== 'completed') {
+      if (txn && txn.status !== 'paid') {
         await pool.execute(
-          'UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
+          'UPDATE transactions SET status = "paid", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
           [mihpayid, txnid]
         );
         if (txn.type === 'ai_token_purchase') {
@@ -160,7 +160,7 @@ router.post('/payu/webhook', express.urlencoded({ extended: false }), async (req
           await pool.execute('UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?', [txn.credits, txn.tenant_id]);
           console.log(`[PayU:webhook] ✅ Credits +${txn.credits} → tenant ${txn.tenant_id}`);
         }
-      } else if (txn?.status === 'completed') {
+      } else if (txn?.status === 'paid') {
         console.log(`[PayU:webhook] ℹ️  Already processed: ${txnid}`);
       }
     } else {
@@ -198,9 +198,9 @@ router.post('/payu/return', express.urlencoded({ extended: false }), async (req,
       const [[txn]] = await pool.execute(
         'SELECT * FROM transactions WHERE transaction_ref = ? LIMIT 1', [txnid]
       );
-      if (txn && txn.status !== 'completed') {
+      if (txn && txn.status !== 'paid') {
         await pool.execute(
-          'UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
+          'UPDATE transactions SET status = "paid", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?',
           [mihpayid, txnid]
         );
         if (txn.type === 'ai_token_purchase') {
@@ -354,13 +354,13 @@ router.post('/verify', async (req, res) => {
 
       if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
 
-      if (txn.status === 'completed') {
+      if (txn.status === 'paid') {
         const [[t]] = await pool.execute('SELECT credits_balance FROM tenants WHERE id = ?', [tenantId]);
         return res.json({ success: true, creditsAdded: txn.credits, newBalance: t.credits_balance, alreadyProcessed: true });
       }
 
       await pool.execute(
-        'UPDATE transactions SET status = "completed", updated_at = NOW() WHERE transaction_ref = ?',
+        'UPDATE transactions SET status = "paid", updated_at = NOW() WHERE transaction_ref = ?',
         [orderId]
       );
       await pool.execute(
@@ -476,13 +476,13 @@ router.post('/verify-ai', async (req, res) => {
 
       if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
 
-      if (txn.status === 'completed') {
+      if (txn.status === 'paid') {
         const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
         return res.json({ success: true, tokensAdded: txn.credits, newBalance: t.ai_tokens_balance, alreadyProcessed: true });
       }
 
       await pool.execute(
-        'UPDATE transactions SET status = "completed", updated_at = NOW() WHERE transaction_ref = ?',
+        'UPDATE transactions SET status = "paid", updated_at = NOW() WHERE transaction_ref = ?',
         [orderId]
       );
       await pool.execute(
@@ -615,12 +615,12 @@ router.post('/payu/verify', async (req, res) => {
       );
       if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
 
-      if (txn.status === 'completed') {
+      if (txn.status === 'paid') {
         const [[t]] = await pool.execute('SELECT credits_balance FROM tenants WHERE id = ?', [tenantId]);
         return res.json({ success: true, creditsAdded: txn.credits, newBalance: t.credits_balance, alreadyProcessed: true });
       }
 
-      await pool.execute('UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?', [mihpayid, txnid]);
+      await pool.execute('UPDATE transactions SET status = "paid", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?', [mihpayid, txnid]);
       await pool.execute('UPDATE tenants SET credits_balance = credits_balance + ? WHERE id = ?', [txn.credits, tenantId]);
       const [[t]] = await pool.execute('SELECT credits_balance FROM tenants WHERE id = ?', [tenantId]);
 
@@ -701,12 +701,12 @@ router.post('/payu/verify-ai', async (req, res) => {
       );
       if (!txn) return res.status(404).json({ success: false, error: 'Transaction not found' });
 
-      if (txn.status === 'completed') {
+      if (txn.status === 'paid') {
         const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
         return res.json({ success: true, tokensAdded: txn.credits, newBalance: t.ai_tokens_balance, alreadyProcessed: true });
       }
 
-      await pool.execute('UPDATE transactions SET status = "completed", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?', [mihpayid, txnid]);
+      await pool.execute('UPDATE transactions SET status = "paid", payment_id = ?, updated_at = NOW() WHERE transaction_ref = ?', [mihpayid, txnid]);
       await pool.execute('UPDATE tenants SET ai_tokens_balance = ai_tokens_balance + ? WHERE id = ?', [txn.credits, tenantId]);
       const [[t]] = await pool.execute('SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]);
 
@@ -737,7 +737,7 @@ router.post('/test-purchase', async (req, res) => {
     );
     await pool.execute(
       `INSERT INTO transactions (tenant_id, type, credits, amount, status, description, created_at)
-       VALUES (?, 'credit', ?, ?, 'completed', ?, NOW())`,
+       VALUES (?, 'credit', ?, ?, 'paid', ?, NOW())`,
       [req.user.tenantId, pkg.credits, pkg.price, `Test purchase — ${pkg.credits.toLocaleString()} credits`]
     );
 
