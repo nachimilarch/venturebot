@@ -40,6 +40,7 @@ import tenantSettingsRouter from './routes/tenantSettings.js';
 import dripRouter from './routes/drip.js';
 import onboardingRouter from './routes/onboarding.js';
 import aiRouter from './routes/ai.js';
+import templatesRouter from './routes/templates.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
 import { startDripScheduler } from './services/dripScheduler.js';
 
@@ -115,6 +116,9 @@ app.use('/api/onboarding', onboardingRouter);
 
 // AI features (Ollama-backed)
 app.use('/api/ai', aiRouter);
+
+// WhatsApp template management (JWT-protected, dashboard-facing)
+app.use('/api/templates', templatesRouter);
 
 // CRM Integration API v1 (API-key-protected)
 app.use('/api/v1/credits',   v1CreditsRouter);
