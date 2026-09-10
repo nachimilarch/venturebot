@@ -1,11 +1,11 @@
 // pages/FlowBuilder.tsx — visual flow builder
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus, Trash2, Edit, ArrowDown, Play, Pause,
+  Plus, Trash2, Edit, ArrowDown,
   ChevronLeft, MessageSquare, List, MousePointerClick,
-  FileText, Tag, Square, Save, RefreshCw, Zap, Sparkles, Loader2,
-  MoreVertical, Pencil,
+  FileText, Tag, Save, RefreshCw, Zap, Sparkles, Loader2,
+  MoreVertical, Pencil, GripVertical,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -255,6 +255,11 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
   const [addForm, setAddForm]     = useState<Omit<FlowNode,'id'>>(EMPTY_NODE);
   const [addBtns, setAddBtns]     = useState('');
 
+  // Drag-and-drop state
+  const [dragIdx, setDragIdx]   = useState<number | null>(null);
+  const [dropIdx, setDropIdx]   = useState<number | null>(null);
+  const dragCounter = useRef(0);
+
   // AI Flow Builder state
   const [aiBuildOpen, setAiBuildOpen]   = useState(false);
   const [aiDesc, setAiDesc]             = useState('');
@@ -270,6 +275,33 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
     } catch { toast.error('Failed to load nodes'); }
     finally { setLoading(false); }
   }, [flow.id]);
+
+  // Drag-and-drop handlers
+  const handleDragStart = (i: number) => {
+    setDragIdx(i);
+    dragCounter.current = 0;
+  };
+  const handleDragEnter = (i: number) => {
+    dragCounter.current++;
+    if (i !== dragIdx) setDropIdx(i);
+  };
+  const handleDragLeave = () => {
+    dragCounter.current--;
+    if (dragCounter.current === 0) setDropIdx(null);
+  };
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDrop = (toIdx: number) => {
+    if (dragIdx === null || dragIdx === toIdx) { resetDrag(); return; }
+    const reordered = [...nodes];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    setNodes(reordered);
+    api.patch(`/api/flows/${flow.id}/nodes/reorder`, {
+      order: reordered.map((n, i) => ({ id: n.id, sort_order: (i + 1) * 10 })),
+    }).catch(() => { toast.error('Reorder failed'); fetchNodes(); });
+    resetDrag();
+  };
+  const resetDrag = () => { setDragIdx(null); setDropIdx(null); dragCounter.current = 0; };
 
   useEffect(() => { fetchNodes(); }, [fetchNodes]);
 
@@ -381,7 +413,7 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
 
       {/* How it works */}
       <div className="rounded-lg bg-muted/40 border p-3 text-xs text-muted-foreground">
-        <strong className="text-foreground">How flows work:</strong> When a contact sends a message matching a node's <em>trigger keyword</em>, Vaartabot sends that node's reply. Set <em>next trigger</em> to chain nodes together.
+        <strong className="text-foreground">How flows work:</strong> When a contact sends a message matching a node's <em>trigger keyword</em>, Vaartabot sends that node's reply. Set <em>next trigger</em> to chain nodes together. <strong className="text-foreground">Drag</strong> the <GripVertical className="inline w-3 h-3 -mt-0.5" /> handle to reorder steps.
       </div>
 
       {/* Node list */}
@@ -395,18 +427,40 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
         <div className="space-y-1">
           {nodes.map((node, i) => (
             <div key={node.id}>
+              {/* Drop-zone indicator above */}
+              {dropIdx === i && dragIdx !== null && dragIdx !== i && dragIdx !== i - 1 && (
+                <div className="h-1 rounded-full bg-primary mx-2 mb-1 transition-all" />
+              )}
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.04 }}
-                className="rounded-xl border bg-card p-4 space-y-2"
+                draggable
+                onDragStart={() => handleDragStart(i)}
+                onDragEnter={() => handleDragEnter(i)}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(i)}
+                onDragEnd={resetDrag}
+                className={cn(
+                  'rounded-xl border bg-card p-4 space-y-2 transition-all select-none',
+                  dragIdx === i && 'opacity-40 scale-[0.98] shadow-none',
+                  dropIdx === i && dragIdx !== i && 'ring-2 ring-primary',
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-mono px-2 py-0.5 rounded-full">
-                      <Tag className="w-3 h-3" /> {node.trigger}
+                  {/* Drag handle + meta */}
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground shrink-0 pt-0.5">
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs text-muted-foreground font-medium shrink-0">
+                      {String(i + 1).padStart(2, '0')}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-mono px-2 py-0.5 rounded-full truncate">
+                      <Tag className="w-3 h-3 shrink-0" /> {node.trigger}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                       {TYPE_ICONS[node.message_type]} {node.message_type}
                     </span>
                   </div>
@@ -419,17 +473,17 @@ function FlowEditor({ flow, onBack }: { flow: Flow; onBack: () => void }) {
                     </Button>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground line-clamp-2 pl-1">{node.message}</p>
+                <p className="text-sm text-muted-foreground line-clamp-2 pl-8">{node.message}</p>
                 {node.buttons && node.buttons.length > 0 && (
-                  <div className="flex gap-1 flex-wrap pl-1">
+                  <div className="flex gap-1 flex-wrap pl-8">
                     {node.buttons.map(b => (
                       <span key={b.id} className="border rounded-full text-xs px-2 py-0.5">{b.title}</span>
                     ))}
                   </div>
                 )}
                 {node.next_trigger && (
-                  <p className="text-xs text-muted-foreground pl-1">
-                    → awaits trigger: <code className="text-primary">{node.next_trigger}</code>
+                  <p className="text-xs text-muted-foreground pl-8">
+                    → awaits: <code className="text-primary">{node.next_trigger}</code>
                   </p>
                 )}
               </motion.div>
