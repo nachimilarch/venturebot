@@ -20,12 +20,8 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-declare global {
-  interface Window { bolt: any; }
-}
-
 const creditPackages = [
-  { id: 1, credits: 500,   label: 'Starter',    icon: Zap,       price: 999   },
+{ id: 1, credits: 500,   label: 'Starter',    icon: Zap,       price: 999   },
   { id: 2, credits: 2000,  label: 'Basic',       icon: MessageSquare, price: 3499  },
   { id: 3, credits: 5000,  label: 'Growth',      icon: Crown,     price: 8499,  popular: true },
   { id: 4, credits: 15000, label: 'Pro',         icon: Gift,      price: 23999 },
@@ -40,31 +36,24 @@ const aiTokenPackages = [
 ];
 
 const PAYU_ENV = import.meta.env.VITE_PAYU_ENV || 'PROD';
+const PAYU_ENDPOINT = PAYU_ENV === 'TEST'
+  ? 'https://test.payu.in/_payment'
+  : 'https://secure.payu.in/_payment';
 
-const loadPayUBolt = (): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (window.bolt) return resolve();
-    // Remove any stale bolt script (env switch)
-    document.getElementById('bolt')?.remove();
-    const script = document.createElement('script');
-    script.id = 'bolt';
-    script.src = PAYU_ENV === 'TEST'
-      ? 'https://sboxcheckout-static.citruspay.com/bolt/run/bolt.min.js'
-      : 'https://checkout-static.payu.in/bolt/run/bolt.min.js';
-    script.setAttribute('bolt-color', '');
-    script.setAttribute('bolt-logo', '');
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load PayU Bolt SDK'));
-    document.head.appendChild(script);
+function submitPayUForm(params: Record<string, string>) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = PAYU_ENDPOINT;
+  Object.entries(params).forEach(([name, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
   });
-
-const launchPayUBolt = (params: Record<string, string>): Promise<any> =>
-  new Promise((resolve, reject) => {
-    window.bolt.launch(params, {
-      responseHandler: (BOLT: any) => resolve(BOLT.response),
-      catchException:  (BOLT: any) => reject(new Error(BOLT?.message || 'PayU error')),
-    });
-  });
+  document.body.appendChild(form);
+  form.submit();
+}
 
 interface AiTokenUsage {
   balance: number;
@@ -105,7 +94,18 @@ const Billing: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPeriod, setFilterPeriod] = useState('all');
 
-  useEffect(() => { loadPayUBolt().catch(console.error); }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (payment === 'success') {
+      toast.success('Payment successful! Your balance has been updated.');
+      refreshBilling();
+      window.history.replaceState({}, '', '/billing');
+    } else if (payment === 'failed') {
+      toast.error('Payment failed or was cancelled.');
+      window.history.replaceState({}, '', '/billing');
+    }
+  }, []);
 
   const refreshBilling = async (silent = true) => {
     if (!silent) setIsRefreshing(true);
@@ -135,44 +135,17 @@ const Billing: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      await loadPayUBolt();
-
       const { data } = await api.post('/api/payments/payu/create-order', { packageId: pkg.id });
       if (!data.success) throw new Error(data.error || 'Order creation failed');
 
       const { txnid, hash, key, amount, productinfo, firstname, email, phone, surl, furl } = data;
 
       setIsPaymentOpen(false);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      let response: any;
-      try {
-        response = await launchPayUBolt({ key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash });
-      } catch (err: any) {
-        toast.error(err.message || 'Payment was cancelled.');
-        setIsProcessing(false);
-        return;
-      }
-
-      if (response?.txnStatus !== 'SUCCESS') {
-        toast.error('Payment failed. Please try again.');
-        setIsProcessing(false);
-        return;
-      }
-
-      const verifyRes = await api.post('/api/payments/payu/verify', { txnid });
-      if (verifyRes.data?.success) {
-        toast.success(`🎉 ${pkg.credits.toLocaleString()} credits added!`);
-        await refreshBilling();
-        setPaymentSuccess({ credits: pkg.credits, orderId: txnid });
-        setIsPaymentOpen(true);
-      } else {
-        toast.error('Verification failed. Contact support.');
-      }
+      submitPayUForm({ key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash });
+      // Page navigates away — no further state update needed
 
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Payment initiation failed.');
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -196,44 +169,17 @@ const Billing: React.FC = () => {
     setIsAiProcessing(true);
 
     try {
-      await loadPayUBolt();
-
       const { data } = await api.post('/api/payments/payu/create-ai-order', { packageId: pkg.id });
       if (!data.success) throw new Error(data.error || 'Order creation failed');
 
       const { txnid, hash, key, amount, productinfo, firstname, email, phone, surl, furl } = data;
 
       setIsAiPaymentOpen(false);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      let response: any;
-      try {
-        response = await launchPayUBolt({ key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash });
-      } catch (err: any) {
-        toast.error(err.message || 'Payment was cancelled.');
-        setIsAiProcessing(false);
-        return;
-      }
-
-      if (response?.txnStatus !== 'SUCCESS') {
-        toast.error('Payment failed. Please try again.');
-        setIsAiProcessing(false);
-        return;
-      }
-
-      const verifyRes = await api.post('/api/payments/payu/verify-ai', { txnid });
-      if (verifyRes.data?.success) {
-        toast.success(`🤖 ${pkg.tokens.toLocaleString()} AI tokens added!`);
-        await refreshBilling();
-        setAiPaymentSuccess({ tokens: pkg.tokens, orderId: txnid });
-        setIsAiPaymentOpen(true);
-      } else {
-        toast.error('Verification failed. Contact support.');
-      }
+      submitPayUForm({ key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash });
+      // Page navigates away — no further state update needed
 
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Payment initiation failed.');
-    } finally {
       setIsAiProcessing(false);
     }
   };
@@ -341,7 +287,7 @@ const Billing: React.FC = () => {
             <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 overflow-hidden">
               <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
                 <DialogTitle className="text-sm font-semibold text-foreground">Buy Message Credits</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Instant delivery · Secure payment via PayU</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Instant delivery · You will be redirected to PayU</p>
               </DialogHeader>
 
               {/* Success state */}
@@ -529,7 +475,7 @@ const Billing: React.FC = () => {
             <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 overflow-hidden">
               <DialogHeader className="px-4 pt-4 pb-3 border-b border-border">
                 <DialogTitle className="text-sm font-semibold text-foreground">Buy AI Tokens</DialogTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Powers AI features · Charged per token · Secure via PayU</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Powers AI features · Charged per token · Redirects to PayU</p>
               </DialogHeader>
 
               {aiPaymentSuccess ? (
