@@ -31,6 +31,7 @@ import Contacts from '@/pages/Contacts';
 import InboxPage from '@/pages/Inbox';
 import Drip from '@/pages/Drip';
 import Staff from '@/pages/Staff';
+import Templates from '@/pages/Templates';
 
 import SuperAdminLogin from '@/pages/superadmin/SuperAdminLogin';
 import SuperAdminGuard from '@/pages/superadmin/SuperAdminGuard';
@@ -80,6 +81,7 @@ const App = () => (
                 <Route path="/appointments" element={<Appointments />} />
                 <Route path="/flow-config" element={<FlowConfig />} />
                 <Route path="/flow-builder" element={<FlowBuilder />} />
+                <Route path="/templates" element={<Templates />} />
                 <Route path="/staff" element={<Staff />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/billing" element={<Billing />} />

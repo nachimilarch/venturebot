@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Megaphone, MessageSquare, Users,
   Calendar, BarChart3, CreditCard, Settings, LogOut,
   X, ChevronRight, Terminal, BookUser, Inbox,
-  GitBranch, Workflow, UserCog, HelpCircle,
+  GitBranch, Workflow, UserCog, HelpCircle, FileText,
 } from 'lucide-react';
 import { useTenant } from '@/contexts/TenantContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +38,7 @@ const NAVIGATION: NavItem[] = [
   { name: 'Appointments',    href: '/appointments',  icon: Calendar,        group: 'crm' },
 
   { name: 'Flow Builder',    href: '/flow-builder',  icon: Workflow,        group: 'automation' },
+  { name: 'Templates',       href: '/templates',     icon: FileText,        group: 'automation' },
   { name: 'Reports',         href: '/reports',       icon: BarChart3,       group: 'automation' },
 
   { name: 'Team',            href: '/staff',         icon: UserCog,         group: 'admin', roles: ['admin'] },
