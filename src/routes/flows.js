@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
 // GET /api/flows/:flowId/nodes — get all nodes for a flow
 router.get('/:flowId/nodes', async (req, res) => {
     const [nodes] = await pool.execute(
-        'SELECT * FROM flow_nodes WHERE flow_id = ? AND tenant_id = ? ORDER BY id ASC',
+        'SELECT * FROM flow_nodes WHERE flow_id = ? AND tenant_id = ? ORDER BY sort_order ASC, id ASC',
         [req.params.flowId, req.user.tenantId]
     );
     res.json({ success: true, data: nodes });
@@ -70,6 +70,26 @@ router.delete('/:flowId/nodes/:nodeId', async (req, res) => {
     );
     invalidateFlowCache(req.user.tenantId);
     res.json({ success: true });
+});
+
+// PATCH /api/flows/:flowId/nodes/reorder — save new node order
+router.patch('/:flowId/nodes/reorder', async (req, res) => {
+    const { order } = req.body; // [{id, sort_order}]
+    if (!Array.isArray(order) || order.length === 0) {
+        return res.status(400).json({ success: false, error: 'order array is required' });
+    }
+    try {
+        for (const { id, sort_order } of order) {
+            await pool.execute(
+                'UPDATE flow_nodes SET sort_order = ? WHERE id = ? AND tenant_id = ?',
+                [sort_order, id, req.user.tenantId]
+            );
+        }
+        invalidateFlowCache(req.user.tenantId);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 // PATCH /api/flows/:flowId/activate — toggle active
