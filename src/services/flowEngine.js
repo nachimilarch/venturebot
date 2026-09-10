@@ -349,7 +349,6 @@ async function processCustomFlowNode(tenantId, from, inputNorm, waConfig) {
 }
 
 // ─── AI Auto-responder ────────────────────────────────────────────────────────
-// Fallback when no custom flow or hardcoded flow config is found for a tenant.
 // Returns true if a response was sent, false if disabled or error.
 async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
   try {
@@ -358,6 +357,11 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
       [tenantId]
     );
     if (!setting || setting.value !== 'true') return false;
+
+    // If session is in a structured booking state, let the flow engine handle it
+    const session = await getOrCreateSession(from);
+    const BOOKING_STATES = new Set(['BOOK_TYPE', 'BOOK_SLOT', 'BOOK_CONFIRM', 'MY_APPTS', 'CANCEL_CONFIRM']);
+    if (BOOKING_STATES.has(session.state)) return false;
 
     // Check credits
     const [[creditRow]] = await pool.execute(
@@ -376,6 +380,45 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
     if (!tokenRow || Number(tokenRow.ai_tokens_balance) <= 0) {
       console.warn(`[AI:autoresponder] No AI tokens for tenant ${tenantId}`);
       return false;
+    }
+
+    // Acknowledge media messages without invoking the LLM
+    if (userInput.startsWith('__') && userInput.endsWith('__')) {
+      const mediaLabel = userInput === '__image__' ? 'image' :
+                         userInput === '__document__' ? 'file' :
+                         userInput === '__audio__' ? 'voice message' : 'media';
+      const ack = `Thanks for sending that ${mediaLabel}! Our team has been notified and will review it shortly. 😊`;
+      await sendText(from, ack, waConfig);
+      await pool.execute(
+        'UPDATE tenants SET credits_balance = GREATEST(0, credits_balance - 1) WHERE id = ?',
+        [tenantId]
+      );
+      await pool.execute(
+        `INSERT INTO message_logs (tenant_id, contact_phone, message, status, direction, sent_at, created_at)
+         VALUES (?, ?, ?, 'sent', 'outbound', NOW(), NOW())`,
+        [tenantId, from, ack]
+      ).catch(() => {});
+      return true;
+    }
+
+    // Detect booking/appointment intent → trigger structured booking flow
+    const BOOKING_KEYWORDS = ['book', 'appointment', 'schedule', 'meeting', 'slot', 'reserve', 'demo', 'visit', 'call me back'];
+    const hasBookingIntent = BOOKING_KEYWORDS.some(k => userInput.toLowerCase().includes(k));
+    if (hasBookingIntent) {
+      const fc = (await getTenantFlowConfig(tenantId)) || {};
+      const bridgeMsg = `I'd be happy to help you schedule a meeting! Here are the available appointment types:`;
+      await sendText(from, bridgeMsg, waConfig);
+      await pool.execute(
+        'UPDATE tenants SET credits_balance = GREATEST(0, credits_balance - 1) WHERE id = ?',
+        [tenantId]
+      );
+      await pool.execute(
+        `INSERT INTO message_logs (tenant_id, contact_phone, message, status, direction, sent_at, created_at)
+         VALUES (?, ?, ?, 'sent', 'outbound', NOW(), NOW())`,
+        [tenantId, from, bridgeMsg]
+      ).catch(() => {});
+      await showBookType(from, {}, waConfig, { ...DEFAULTS, ...fc });
+      return true;
     }
 
     // Fetch custom system prompt if set
@@ -397,11 +440,15 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
       .map(m => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.message}`)
       .join('\n');
 
+    // Default prompt strictly confines AI to the company's own services
     const systemPrompt = customPrompt ||
-      `You are a helpful WhatsApp assistant for ${tenantName}.
+      `You are a WhatsApp customer support assistant for ${tenantName}.
+Your ONLY role is to answer questions about ${tenantName}'s own products, services, pricing, and appointments.
 Reply in 1-2 short sentences. Be friendly and professional.
-If you cannot help with something specific, offer to connect them with the team.
-Never make up prices, dates, or details you don't know.`;
+If a question is not related to ${tenantName}'s services, politely decline and say "I can only help with ${tenantName}-related questions. For anything else, please contact our team."
+Never discuss competitors, give general advice, or answer off-topic questions.
+Never make up prices, dates, availability, or any details you are not certain about.
+If you don't know something about the business, say "I'll connect you with our team for that."`;
 
     const userPrompt = history
       ? `Conversation:\n${history}\n\nRespond to the customer's latest message.`
@@ -417,20 +464,17 @@ Never make up prices, dates, or details you don't know.`;
     if (text) {
       await sendText(from, text, waConfig);
 
-      // Log outbound message
       await pool.execute(
         `INSERT INTO message_logs (tenant_id, contact_phone, message, status, direction, sent_at, created_at)
          VALUES (?, ?, ?, 'sent', 'outbound', NOW(), NOW())`,
         [tenantId, from, text]
       ).catch(() => {});
 
-      // Deduct 1 credit
       await pool.execute(
         'UPDATE tenants SET credits_balance = GREATEST(0, credits_balance - 1) WHERE id = ?',
         [tenantId]
       );
 
-      // Log + deduct AI tokens
       const totalTokens = inputTokens + outputTokens;
       if (totalTokens > 0) {
         await pool.execute(
@@ -485,11 +529,14 @@ export async function processFlow(tenantId, from, userInput, rawMessage) {
   const customHandled = await processCustomFlowNode(tenantId, from, inputNorm, waConfig);
   if (customHandled) return;
 
-  const flowConfig = await getTenantFlowConfig(tenantId);
-  if (!flowConfig) return;
-
-
+  let flowConfig = await getTenantFlowConfig(tenantId);
   const session = await getOrCreateSession(from);
+  const BOOKING_STATES_SET = new Set(['BOOK_TYPE', 'BOOK_SLOT', 'BOOK_CONFIRM', 'MY_APPTS', 'CANCEL_CONFIRM', 'MAIN_MENU', 'ONBOARDING_NAME', 'ONBOARDING_INTEREST', 'ONBOARDING_BUDGET', 'CANCEL_CONFIRM']);
+  if (!flowConfig) {
+    if (!BOOKING_STATES_SET.has(session.state) && session.state !== 'START') return;
+    flowConfig = {}; // use DEFAULTS via cfg()
+  }
+
   const state = session.state;
   const sessionData = session.data
     ? (typeof session.data === 'string' ? JSON.parse(session.data) : session.data)

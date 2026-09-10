@@ -218,18 +218,39 @@ router.post('/webhook', express.json({ limit: '2mb' }), async (req, res) => {
       message.button?.payload ||
       message.interactive?.button_reply?.title ||
       message.interactive?.list_reply?.title ||
+      message.image?.caption ||
+      message.document?.caption ||
       `[${message.type}]`;
+
+    // Extract media metadata for image/document messages
+    const mediaId       = message.image?.id || message.document?.id || null;
+    const mediaType     = message.image?.mime_type || message.document?.mime_type || null;
+    const mediaCaption  = message.image?.caption || message.document?.caption || null;
+    const mediaFilename = message.document?.filename || null;
 
     try {
       await pool.execute(
         `INSERT INTO message_logs
-          (tenant_id, campaign_id, contact_phone, message, status, direction, sent_at, message_id)
-         VALUES (?, NULL, ?, ?, 'received', 'inbound', NOW(), ?)
+          (tenant_id, campaign_id, contact_phone, message, status, direction, sent_at, message_id,
+           media_id, media_type, media_caption, media_filename)
+         VALUES (?, NULL, ?, ?, 'received', 'inbound', NOW(), ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE status = 'received'`,
-        [tenantId, from, inboundText, message.id]
+        [tenantId, from, inboundText, message.id,
+         mediaId, mediaType, mediaCaption, mediaFilename]
       );
     } catch (err) {
-      console.error('[Webhook:POST] message_logs insert failed:', err.message);
+      // Fallback: insert without media columns (pre-migration compatibility)
+      try {
+        await pool.execute(
+          `INSERT INTO message_logs
+            (tenant_id, campaign_id, contact_phone, message, status, direction, sent_at, message_id)
+           VALUES (?, NULL, ?, ?, 'received', 'inbound', NOW(), ?)
+           ON DUPLICATE KEY UPDATE status = 'received'`,
+          [tenantId, from, inboundText, message.id]
+        );
+      } catch (err2) {
+        console.error('[Webhook:POST] message_logs insert failed:', err2.message);
+      }
     }
 
     // Upsert contact + update last_message_at (fire-and-forget)

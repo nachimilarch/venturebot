@@ -1,11 +1,15 @@
 // routes/inbox.js — JWT-protected conversation inbox
 import express from 'express';
+import multer from 'multer';
+import axios from 'axios';
 import pool from '../config/database.js';
 import { authMiddleware } from '../middleware/auth.js';
 import whatsappTemplateService from '../services/whatsappTemplateService.js';
 
 const router = express.Router();
 router.use(authMiddleware);
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
 
 function formatPhone(phone) {
   let cleaned = phone.replace(/[^0-9]/g, '');
@@ -85,6 +89,122 @@ router.get('/unread-count', async (req, res) => {
   }
 });
 
+// ─── GET /api/inbox/media/:mediaId ────────────────────────────────────────────
+// Proxy media binary from WhatsApp (requires tenant access_token)
+router.get('/media/:mediaId', async (req, res) => {
+  try {
+    const waConfig = await getWaConfig(req.user.tenantId);
+    if (!waConfig) return res.status(400).json({ success: false, error: 'WhatsApp not configured' });
+
+    const urlRes = await whatsappTemplateService.getMediaUrl(req.params.mediaId, waConfig);
+    if (!urlRes.success) return res.status(404).json({ success: false, error: urlRes.error });
+
+    const mediaRes = await axios.get(urlRes.url, {
+      responseType: 'arraybuffer',
+      headers: { Authorization: `Bearer ${waConfig.access_token}` },
+    });
+
+    res.setHeader('Content-Type', urlRes.mime_type || mediaRes.headers['content-type'] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.send(mediaRes.data);
+  } catch (err) {
+    console.error('[inbox/media]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/inbox/upload-media ─────────────────────────────────────────────
+// Upload a file from the agent's browser to WhatsApp; returns media_id
+router.post('/upload-media', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+    const waConfig = await getWaConfig(req.user.tenantId);
+    if (!waConfig) return res.status(400).json({ success: false, error: 'WhatsApp not configured' });
+
+    const result = await whatsappTemplateService.uploadMedia(
+      req.file.buffer,
+      req.file.mimetype,
+      req.file.originalname,
+      waConfig
+    );
+
+    if (!result.success) return res.status(422).json({ success: false, error: result.error });
+
+    res.json({ success: true, media_id: result.media_id, mime_type: req.file.mimetype, filename: req.file.originalname });
+  } catch (err) {
+    console.error('[inbox/upload-media]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/inbox/:phone/reply-media ──────────────────────────────────────
+// Send an image or document to a contact
+// body: { type: 'image'|'document', media_id?: string, url?: string, caption?: string, filename?: string }
+router.post('/:phone/reply-media', async (req, res) => {
+  try {
+    const { type, media_id, url: mediaUrl, caption, filename } = req.body;
+    if (!type || !['image', 'document'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'type must be image or document' });
+    }
+    if (!media_id && !mediaUrl) {
+      return res.status(400).json({ success: false, error: 'media_id or url is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+    const phone    = formatPhone(req.params.phone);
+
+    const waConfig = await getWaConfig(tenantId);
+    if (!waConfig) return res.status(400).json({ success: false, error: 'WhatsApp not configured' });
+
+    const source = media_id ? { id: media_id } : { link: mediaUrl };
+    const result = await whatsappTemplateService.sendMediaMessage(phone, type, source, caption || '', filename || '', waConfig);
+
+    if (!result.success) return res.status(422).json({ success: false, error: result.error });
+
+    const displayMsg = caption || (type === 'document' ? `📄 ${filename || 'Document'}` : '🖼️ Image');
+    const [log] = await pool.execute(
+      `INSERT INTO message_logs
+       (tenant_id, contact_phone, message, status, direction, is_read, sent_at, message_id,
+        media_type, media_caption, media_filename)
+       VALUES (?, ?, ?, 'sent', 'outbound', 1, NOW(), ?, ?, ?, ?)`,
+      [tenantId, phone, displayMsg, result.messageId || null,
+       type === 'image' ? 'image/jpeg' : 'application/pdf', caption || null, filename || null]
+    ).catch(async () => {
+      // Fallback without media columns (pre-migration)
+      return pool.execute(
+        `INSERT INTO message_logs
+         (tenant_id, contact_phone, message, status, direction, is_read, sent_at, message_id)
+         VALUES (?, ?, ?, 'sent', 'outbound', 1, NOW(), ?)`,
+        [tenantId, phone, displayMsg, result.messageId || null]
+      );
+    });
+
+    pool.execute(
+      'UPDATE contacts SET last_message_at = NOW() WHERE tenant_id = ? AND phone = ?',
+      [tenantId, phone]
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      data: {
+        id: log.insertId,
+        message: displayMsg,
+        direction: 'outbound',
+        status: 'sent',
+        media_type: type === 'image' ? 'image/jpeg' : 'application/pdf',
+        media_caption: caption || null,
+        media_filename: filename || null,
+        sent_at: new Date().toISOString(),
+        messageId: result.messageId,
+      },
+    });
+  } catch (err) {
+    console.error('[inbox/reply-media]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── GET /api/inbox/:phone ────────────────────────────────────────────────────
 router.get('/:phone', async (req, res) => {
   try {
@@ -95,7 +215,8 @@ router.get('/:phone', async (req, res) => {
 
     const [messages] = await pool.execute(
       `SELECT id, message, direction, status, is_read,
-              sent_at, received_at, delivered_at, read_at, message_id
+              sent_at, received_at, delivered_at, read_at, message_id,
+              media_id, media_type, media_caption, media_filename
        FROM message_logs
        WHERE tenant_id = ? AND contact_phone = ?
        ORDER BY COALESCE(sent_at, received_at) DESC

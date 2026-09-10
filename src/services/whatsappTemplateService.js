@@ -244,6 +244,82 @@ class WhatsAppTemplateService {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Upload a media file buffer to WhatsApp and return the media_id
+  // mimeType: 'image/jpeg' | 'image/png' | 'application/pdf' etc.
+  // ─────────────────────────────────────────────────────────────────────────
+  async uploadMedia(fileBuffer, mimeType, originalName, config) {
+    const { access_token, phone_number_id, api_version } = requireConfig(config);
+    const FormData = (await import('form-data')).default;
+
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('file', fileBuffer, { filename: originalName || 'upload', contentType: mimeType });
+
+    try {
+      const response = await axios.post(
+        `https://graph.facebook.com/${api_version}/${phone_number_id}/media`,
+        form,
+        { headers: { ...form.getHeaders(), Authorization: `Bearer ${access_token}` } }
+      );
+      return { success: true, media_id: response.data.id };
+    } catch (err) {
+      console.error('❌ uploadMedia error:', err.response?.data || err.message);
+      return { success: false, error: err.response?.data?.error?.message || err.message };
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Fetch the download URL for a media_id from WhatsApp
+  // ─────────────────────────────────────────────────────────────────────────
+  async getMediaUrl(mediaId, config) {
+    const { access_token, api_version } = requireConfig(config);
+    try {
+      const response = await axios.get(
+        `https://graph.facebook.com/${api_version}/${mediaId}`,
+        { headers: { Authorization: `Bearer ${access_token}` } }
+      );
+      return { success: true, url: response.data.url, mime_type: response.data.mime_type, file_size: response.data.file_size };
+    } catch (err) {
+      console.error('❌ getMediaUrl error:', err.response?.data || err.message);
+      return { success: false, error: err.response?.data?.error?.message || err.message };
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Send an image or document message
+  // type: 'image' | 'document'
+  // source: { id: 'media_id' } OR { link: 'https://...' }
+  // ─────────────────────────────────────────────────────────────────────────
+  async sendMediaMessage(to, type, source, caption, filename, config) {
+    const { access_token, phone_number_id, api_version } = requireConfig(config);
+
+    try {
+      const formattedPhone = formatPhone(to);
+      const url = `https://graph.facebook.com/${api_version}/${phone_number_id}/messages`;
+
+      const mediaObj = { ...source };
+      if (caption) mediaObj.caption = caption;
+      if (type === 'document' && filename) mediaObj.filename = filename;
+
+      const payload = {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type,
+        [type]: mediaObj,
+      };
+
+      const response = await axios.post(url, payload, { headers: buildHeaders(access_token) });
+      console.log(`✅ Media (${type}) sent:`, response.data.messages?.[0]?.id);
+
+      return { success: true, messageId: response.data.messages?.[0]?.id, data: response.data };
+    } catch (err) {
+      const fbError = err.response?.data?.error;
+      console.error('❌ sendMediaMessage error:', fbError || err.message);
+      return { success: false, error: fbError?.message || err.message };
+    }
+  }
+
   buildTemplateComponents(message, type = 'UTILITY') {
     let bodyText = message;
     if (type === 'MARKETING' && !message.toLowerCase().includes('stop')) {
