@@ -732,12 +732,15 @@ const CreditAlertCard: React.FC = () => {
 
 // ─── AI Autoresponder Card ────────────────────────────────────────────────────
 const AiAutoresponderCard: React.FC = () => {
-  const [enabled, setEnabled] = useState(false);
-  const [saving, setSaving]   = useState(false);
+  const [enabled, setEnabled]         = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [saving, setSaving]           = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
 
   useEffect(() => {
     axios.get('/api/tenant-settings').then(({ data }) => {
       setEnabled(data.data?.ai_autoresponder_enabled === true || data.data?.ai_autoresponder_enabled === 'true');
+      setSystemPrompt(data.data?.ai_system_prompt ?? '');
     }).catch(() => {});
   }, []);
 
@@ -755,6 +758,18 @@ const AiAutoresponderCard: React.FC = () => {
     }
   };
 
+  const savePrompt = async () => {
+    setSavingPrompt(true);
+    try {
+      await axios.put('/api/tenant-settings/ai_system_prompt', { value: systemPrompt });
+      toast.success('Business context saved');
+    } catch {
+      toast.error('Save failed');
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.28 }}
       className="rounded-2xl border bg-card shadow-sm p-6 space-y-4">
@@ -766,18 +781,39 @@ const AiAutoresponderCard: React.FC = () => {
         </span>
       </div>
       <p className="text-sm text-muted-foreground">
-        When enabled, inbound WhatsApp messages that don't match any keyword flow are answered automatically by AI (llama3.2:3b, hosted locally). Limited to 100 AI replies per day across all contacts.
+        When enabled, every inbound WhatsApp message is handled by AI (llama3.2:3b). The AI reads the conversation history and replies automatically — no human agent needed. Each reply uses 1 credit + AI tokens.
       </p>
       <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
         <div>
           <p className="font-medium text-sm">Enable AI autoresponder</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Replies to unmatched messages 24/7</p>
+          <p className="text-xs text-muted-foreground mt-0.5">AI handles every inbound message 24/7</p>
         </div>
         <Switch checked={enabled} onCheckedChange={toggle} disabled={saving} />
       </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Business context (system prompt)</label>
+        <p className="text-xs text-muted-foreground">
+          Tell the AI about your business — what you sell, your tone, what it should and shouldn't say. Leave blank to use the default prompt.
+        </p>
+        <textarea
+          value={systemPrompt}
+          onChange={e => setSystemPrompt(e.target.value)}
+          placeholder={`Example:\nYou are a customer support agent for Acme Bakery, a home-delivery bakery in Hyderabad.\nWe sell cakes, cookies, and brownies. Prices range from ₹200–₹2000.\nAlways be warm and friendly. For orders, ask for: item, quantity, delivery address, and preferred date.\nNever promise same-day delivery. For complaints, apologise and offer a 10% discount on the next order.`}
+          rows={6}
+          className="w-full rounded-lg border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+        />
+        <div className="flex justify-end">
+          <Button size="sm" onClick={savePrompt} disabled={savingPrompt} className="gap-1.5">
+            {savingPrompt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {savingPrompt ? 'Saving…' : 'Save context'}
+          </Button>
+        </div>
+      </div>
+
       {enabled && (
         <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2">
-          AI responses use your daily limit (100/day). Custom flows and keyword triggers always take priority.
+          AI is handling all inbound messages. Each reply costs 1 credit + AI tokens. Make sure both balances are topped up in Billing.
         </p>
       )}
     </motion.div>
