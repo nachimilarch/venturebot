@@ -359,22 +359,46 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
     );
     if (!setting || setting.value !== 'true') return false;
 
-    const [[tenant]] = await pool.execute(
-      'SELECT name FROM tenants WHERE id = ? LIMIT 1', [tenantId]
+    // Check credits
+    const [[creditRow]] = await pool.execute(
+      'SELECT credits_balance, name FROM tenants WHERE id = ? LIMIT 1', [tenantId]
     );
-    const tenantName = tenant?.name || 'our business';
+    if (!creditRow || Number(creditRow.credits_balance) <= 0) {
+      console.warn(`[AI:autoresponder] No credits for tenant ${tenantId}`);
+      return false;
+    }
+    const tenantName = creditRow.name || 'our business';
+
+    // Check AI token balance
+    const [[tokenRow]] = await pool.execute(
+      'SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]
+    );
+    if (!tokenRow || Number(tokenRow.ai_tokens_balance) <= 0) {
+      console.warn(`[AI:autoresponder] No AI tokens for tenant ${tenantId}`);
+      return false;
+    }
+
+    // Fetch custom system prompt if set
+    const [[promptRow]] = await pool.execute(
+      "SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = 'ai_system_prompt'",
+      [tenantId]
+    );
+    const customPrompt = promptRow?.value
+      ? promptRow.value.replace(/^"|"$/g, '')
+      : null;
 
     const [msgs] = await pool.execute(
       `SELECT direction, message FROM message_logs
        WHERE tenant_id = ? AND contact_phone = ?
-       ORDER BY COALESCE(sent_at, received_at) DESC LIMIT 8`,
+       ORDER BY COALESCE(sent_at, received_at) DESC LIMIT 10`,
       [tenantId, from]
     );
     const history = msgs.reverse()
       .map(m => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.message}`)
       .join('\n');
 
-    const systemPrompt = `You are a helpful WhatsApp assistant for ${tenantName}.
+    const systemPrompt = customPrompt ||
+      `You are a helpful WhatsApp assistant for ${tenantName}.
 Reply in 1-2 short sentences. Be friendly and professional.
 If you cannot help with something specific, offer to connect them with the team.
 Never make up prices, dates, or details you don't know.`;
@@ -383,7 +407,7 @@ Never make up prices, dates, or details you don't know.`;
       ? `Conversation:\n${history}\n\nRespond to the customer's latest message.`
       : `Customer says: ${userInput}\n\nWrite a friendly, helpful reply.`;
 
-    const { text } = await ollamaChat({
+    const { text, inputTokens = 0, outputTokens = 0 } = await ollamaChat({
       tenantId: String(tenantId),
       feature: 'autoresponder',
       systemPrompt,
@@ -392,11 +416,39 @@ Never make up prices, dates, or details you don't know.`;
 
     if (text) {
       await sendText(from, text, waConfig);
-      console.log(`[Flow] AI autoresponder replied to ${from}`);
+
+      // Log outbound message
+      await pool.execute(
+        `INSERT INTO message_logs (tenant_id, contact_phone, message, status, direction, sent_at, created_at)
+         VALUES (?, ?, ?, 'sent', 'outbound', NOW(), NOW())`,
+        [tenantId, from, text]
+      ).catch(() => {});
+
+      // Deduct 1 credit
+      await pool.execute(
+        'UPDATE tenants SET credits_balance = GREATEST(0, credits_balance - 1) WHERE id = ?',
+        [tenantId]
+      );
+
+      // Log + deduct AI tokens
+      const totalTokens = inputTokens + outputTokens;
+      if (totalTokens > 0) {
+        await pool.execute(
+          `INSERT INTO ai_usage_logs (tenant_id, feature, model, input_tokens, output_tokens, total_tokens, cached, created_at)
+           VALUES (?, 'autoresponder', 'llama3.2:3b', ?, ?, ?, 0, NOW())`,
+          [tenantId, inputTokens, outputTokens, totalTokens]
+        ).catch(() => {});
+        await pool.execute(
+          'UPDATE tenants SET ai_tokens_balance = GREATEST(0, ai_tokens_balance - ?) WHERE id = ?',
+          [totalTokens, tenantId]
+        );
+      }
+
+      console.log(`[AI:autoresponder] replied to ${from} (tenant ${tenantId}), tokens: ${totalTokens}`);
     }
     return true;
   } catch (err) {
-    console.error('[Flow] AI autoresponder error:', err.message);
+    console.error('[AI:autoresponder] error:', err.message);
     return false;
   }
 }
@@ -425,15 +477,16 @@ export async function processFlow(tenantId, from, userInput, rawMessage) {
     return;
   }
 
+  // ── AI autoresponder (when enabled, handles the entire conversation) ───────
+  const aiHandled = await tryAiAutoRespond(tenantId, from, userInput, waConfig);
+  if (aiHandled) return;
+
   // ── Custom flow nodes (take priority over hardcoded flow) ─────────────────
   const customHandled = await processCustomFlowNode(tenantId, from, inputNorm, waConfig);
   if (customHandled) return;
 
   const flowConfig = await getTenantFlowConfig(tenantId);
-  if (!flowConfig) {
-    await tryAiAutoRespond(tenantId, from, userInput, waConfig);
-    return;
-  }
+  if (!flowConfig) return;
 
 
   const session = await getOrCreateSession(from);

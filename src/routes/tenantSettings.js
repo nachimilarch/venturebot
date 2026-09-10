@@ -32,6 +32,7 @@ router.put('/:key', async (req, res) => {
       'business_hours',
       'notifications',
       'ai_autoresponder_enabled',
+      'ai_system_prompt',
     ];
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ success: false, error: 'Unknown setting key' });
