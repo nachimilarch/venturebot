@@ -9,12 +9,19 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DAILY_LIMIT  = 1000;            // AI calls per tenant per calendar day (UTC)
 const CACHE_MAX    = 300;
 
-// ── Serial queue — Ollama handles one request at a time on CPU ────────────────
-let queue = Promise.resolve();
-function enqueue(fn) {
-  const p = queue.then(fn);
-  queue = p.catch(() => {});
-  return p;
+// ── Per-tenant serial queues — different tenants run in parallel ──────────────
+// Each tenant gets its own promise chain so one slow response doesn't block others.
+const tenantQueues = new Map();
+
+function enqueue(tenantId, fn) {
+  const prev = tenantQueues.get(tenantId) || Promise.resolve();
+  const next = prev.then(fn).catch(() => {});
+  tenantQueues.set(tenantId, next);
+  // Prune resolved chains to avoid memory growth
+  next.finally(() => {
+    if (tenantQueues.get(tenantId) === next) tenantQueues.delete(tenantId);
+  });
+  return prev.then(fn);
 }
 
 // ── Response cache (in-process LRU-ish Map) ───────────────────────────────────
@@ -34,57 +41,92 @@ function cacheSet(key, value) {
   cache.set(key, { value, ts: Date.now() });
 }
 
-// ── DB-backed daily counters ──────────────────────────────────────────────────
-// Keys stored in tenant_settings: `ai_calls:YYYY-MM-DD` and `ai_tokens:YYYY-MM-DD`
-// Values are plain integer strings. Old date rows accumulate harmlessly.
+// ── In-memory daily counters with periodic DB sync ───────────────────────────
+// Eliminates 3 DB round-trips per AI call down to 0 on the hot path.
+// Persisted to DB every 30 s and on process exit. Loaded from DB on first access.
 
 function todayUTC() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
-async function dbGetCounter(tenantId, metric) {
+// { `tenantId:metric:date` -> { count, dirty, loaded } }
+const memCounters = new Map();
+
+function counterKey(tenantId, metric) {
+  return `${tenantId}:${metric}:${todayUTC()}`;
+}
+
+async function loadCounter(tenantId, metric) {
+  const key = counterKey(tenantId, metric);
+  if (memCounters.has(key)) return memCounters.get(key);
   const [[row]] = await pool.execute(
     'SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = ?',
     [tenantId, `${metric}:${todayUTC()}`]
   );
-  return row ? (parseInt(row.value, 10) || 0) : 0;
+  const count = row ? (parseInt(row.value, 10) || 0) : 0;
+  memCounters.set(key, { count, dirty: false });
+  return memCounters.get(key);
 }
 
-// Atomically increments the counter by `by` and returns the new value.
-async function dbIncrCounter(tenantId, metric, by = 1) {
-  const key = `${metric}:${todayUTC()}`;
-  await pool.execute(
-    `INSERT INTO tenant_settings (tenant_id, setting_key, value, updated_at)
-     VALUES (?, ?, ?, NOW())
-     ON DUPLICATE KEY UPDATE
-       value      = CAST(CAST(value AS UNSIGNED) + ? AS CHAR),
-       updated_at = NOW()`,
-    [tenantId, key, String(by), by]
-  );
-  // Re-read so the returned value is always accurate
-  return dbGetCounter(tenantId, metric);
+function incrCounter(tenantId, metric, by = 1) {
+  const key = counterKey(tenantId, metric);
+  const entry = memCounters.get(key);
+  if (entry) {
+    entry.count += by;
+    entry.dirty = true;
+  } else {
+    // Not yet loaded — set optimistically; sync will reconcile
+    memCounters.set(key, { count: by, dirty: true });
+  }
+  return memCounters.get(key).count;
 }
 
-// ── Rate limit check (DB-backed, survives restarts) ───────────────────────────
+async function flushCounters() {
+  const today = todayUTC();
+  for (const [key, entry] of memCounters.entries()) {
+    if (!entry.dirty) continue;
+    const [tenantId, metric] = key.split(':');
+    try {
+      await pool.execute(
+        `INSERT INTO tenant_settings (tenant_id, setting_key, value, updated_at)
+         VALUES (?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE value = ?, updated_at = NOW()`,
+        [tenantId, `${metric}:${today}`, String(entry.count), String(entry.count)]
+      );
+      entry.dirty = false;
+    } catch { /* ignore flush errors */ }
+    // Drop counters for past days
+    if (!key.endsWith(today)) memCounters.delete(key);
+  }
+}
+
+// Flush every 30 s
+setInterval(flushCounters, 30_000).unref();
+// Flush on shutdown
+process.on('exit', () => { flushCounters().catch(() => {}); });
+
+// ── Rate limit check (in-memory, 0 DB queries on hot path) ───────────────────
 async function withinLimit(tenantId) {
-  const count = await dbGetCounter(tenantId, 'ai_calls');
-  if (count >= DAILY_LIMIT) return false;
-  await dbIncrCounter(tenantId, 'ai_calls', 1);
+  const entry = await loadCounter(tenantId, 'ai_calls');
+  if (entry.count >= DAILY_LIMIT) return false;
+  incrCounter(tenantId, 'ai_calls', 1);
   return true;
 }
 
-async function usageRemaining(tenantId) {
-  const count = await dbGetCounter(tenantId, 'ai_calls');
-  return Math.max(0, DAILY_LIMIT - count);
+function usageRemainingSync(tenantId) {
+  const key = counterKey(tenantId, 'ai_calls');
+  const entry = memCounters.get(key);
+  return Math.max(0, DAILY_LIMIT - (entry ? entry.count : 0));
 }
 
-// ── Daily token tracking (DB-backed) ─────────────────────────────────────────
-async function recordDailyTokens(tenantId, tokens) {
-  if (tokens > 0) await dbIncrCounter(tenantId, 'ai_tokens', tokens);
+// ── Daily token tracking ──────────────────────────────────────────────────────
+function recordDailyTokens(tenantId, tokens) {
+  if (tokens > 0) incrCounter(tenantId, 'ai_tokens', tokens);
 }
 
 export async function getDailyTokensUsed(tenantId) {
-  return dbGetCounter(tenantId, 'ai_tokens');
+  const entry = await loadCounter(tenantId, 'ai_tokens');
+  return entry.count;
 }
 
 // ── Ollama HTTP call ──────────────────────────────────────────────────────────
@@ -122,12 +164,12 @@ export async function ollamaChat({ tenantId, feature, systemPrompt, userPrompt, 
   if (cached) {
     return {
       text: cached.text, inputTokens: cached.inputTokens, outputTokens: cached.outputTokens,
-      cached: true, remaining: await usageRemaining(tenantId),
+      cached: true, remaining: usageRemainingSync(tenantId),
     };
   }
 
-  const { text, inputTokens, outputTokens } = await enqueue(() => callOllama(systemPrompt, userPrompt, maxTokens));
+  const { text, inputTokens, outputTokens } = await enqueue(tenantId, () => callOllama(systemPrompt, userPrompt, maxTokens));
   cacheSet(cacheKey, { text, inputTokens, outputTokens });
-  await recordDailyTokens(tenantId, inputTokens + outputTokens);
-  return { text, inputTokens, outputTokens, cached: false, remaining: await usageRemaining(tenantId) };
+  recordDailyTokens(tenantId, inputTokens + outputTokens);
+  return { text, inputTokens, outputTokens, cached: false, remaining: usageRemainingSync(tenantId) };
 }

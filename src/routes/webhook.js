@@ -40,43 +40,43 @@ function extractPhoneNumberId(value) {
   );
 }
 
+// Cache tenant lookups — avoids 1-2 DB queries on every incoming webhook
+const tenantCache = new Map();
+const TENANT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 async function resolveTenant(phoneNumberId) {
   if (!phoneNumberId) return null;
 
+  const cached = tenantCache.get(phoneNumberId);
+  if (cached && Date.now() - cached.ts < TENANT_CACHE_TTL) return cached.tenant;
+
+  let tenant = null;
+
   try {
-    const tenant = await getTenantByPhoneNumberId(phoneNumberId);
-    if (tenant) {
-      return {
-        tenantId: tenant.tenant_id,
-        tenantName: tenant.tenant_name || null,
-        source: 'whatsapp_config_service',
-      };
+    const t = await getTenantByPhoneNumberId(phoneNumberId);
+    if (t) {
+      tenant = { tenantId: t.tenant_id, tenantName: t.tenant_name || null, source: 'whatsapp_config_service' };
     }
   } catch (err) {
     console.warn('[Webhook] getTenantByPhoneNumberId failed:', err.message);
   }
 
-  try {
-    const [rows] = await pool.execute(
-      `SELECT id AS tenant_id, name AS tenant_name
-       FROM tenants
-       WHERE whatsapp_phone_id = ?
-       LIMIT 1`,
-      [phoneNumberId]
-    );
-
-    if (rows.length > 0) {
-      return {
-        tenantId: rows[0].tenant_id,
-        tenantName: rows[0].tenant_name || null,
-        source: 'tenants.whatsapp_phone_id',
-      };
+  if (!tenant) {
+    try {
+      const [rows] = await pool.execute(
+        `SELECT id AS tenant_id, name AS tenant_name FROM tenants WHERE whatsapp_phone_id = ? LIMIT 1`,
+        [phoneNumberId]
+      );
+      if (rows.length > 0) {
+        tenant = { tenantId: rows[0].tenant_id, tenantName: rows[0].tenant_name || null, source: 'tenants.whatsapp_phone_id' };
+      }
+    } catch (err) {
+      console.error('[Webhook] tenants lookup failed:', err.message);
     }
-  } catch (err) {
-    console.error('[Webhook] tenants lookup failed:', err.message);
   }
 
-  return null;
+  if (tenant) tenantCache.set(phoneNumberId, { tenant, ts: Date.now() });
+  return tenant;
 }
 
 // GET /api/whatsapp/webhook
@@ -154,8 +154,6 @@ router.post('/webhook', express.json({ limit: '2mb' }), async (req, res) => {
   res.sendStatus(200);
 
   try {
-    console.log('[Webhook:POST] RAW BODY:', JSON.stringify(req.body, null, 2));
-
     const body = req.body;
     const value = extractValue(body);
 
