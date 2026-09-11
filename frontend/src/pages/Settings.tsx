@@ -5,6 +5,7 @@ import {
   Key, Save, Eye, EyeOff, Copy,
   CheckCircle2, XCircle, Loader2,
   RefreshCw, Zap, Info, Bell, Clock, FileText, Sparkles, Link,
+  Upload, Trash2, FolderOpen, Phone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -668,6 +669,12 @@ const fetchWebhookUrl = async () => {
 
       <AiAutoresponderCard />
 
+      {/* ── AI Portfolio ──────────────────────────────────────────────────── */}
+      <AiPortfolioCard />
+
+      {/* ── Daily WhatsApp Report ─────────────────────────────────────────── */}
+      <DailyReportCard />
+
       {/* ── IndiaMart Integration ─────────────────────────────────────────── */}
       <IndiaMartCard />
 
@@ -880,6 +887,178 @@ const AiAutoresponderCard: React.FC = () => {
           AI is handling all inbound messages. Each reply costs 1 credit + AI tokens. Make sure both balances are topped up in Billing.
         </p>
       )}
+    </motion.div>
+  );
+};
+
+// ─── AI Portfolio Card ────────────────────────────────────────────────────────
+interface PortfolioItem {
+  id: number;
+  file_name: string;
+  file_type: 'image' | 'document';
+  mime_type: string;
+  whatsapp_media_id: string;
+  description: string;
+  created_at: string;
+}
+
+const AiPortfolioCard: React.FC = () => {
+  const [items, setItems]         = useState<PortfolioItem[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [desc, setDesc]           = useState('');
+  const fileRef                   = React.useRef<HTMLInputElement>(null);
+
+  const load = async () => {
+    try {
+      const { data } = await axios.get('/api/ai/portfolio');
+      if (data.success) setItems(data.data);
+    } catch { /* silent */ }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('description', desc.trim() || file.name);
+      await axios.post('/api/ai/portfolio', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('File uploaded to portfolio');
+      setDesc('');
+      if (fileRef.current) fileRef.current.value = '';
+      load();
+    } catch { toast.error('Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const remove = async (id: number) => {
+    try {
+      await axios.delete(`/api/ai/portfolio/${id}`);
+      setItems(prev => prev.filter(i => i.id !== id));
+      toast.success('Removed');
+    } catch { toast.error('Delete failed'); }
+  };
+
+  return (
+    <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.32 }}
+      className="rounded-2xl border bg-card shadow-sm p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <FolderOpen className="w-5 h-5 text-indigo-500" />
+        <h2 className="text-lg font-semibold">AI Portfolio</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Upload company brochures, product catalogs, or images. When a lead asks for your profile or brochure on WhatsApp, the AI will automatically send these files.
+      </p>
+
+      {/* Upload row */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Input
+          placeholder="Label (e.g. Company Brochure 2025)"
+          value={desc}
+          onChange={e => setDesc(e.target.value)}
+          className="flex-1"
+        />
+        <Button
+          variant="outline"
+          className="gap-1.5 whitespace-nowrap"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+        >
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploading ? 'Uploading…' : 'Upload file'}
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,.pdf"
+          className="hidden"
+          onChange={upload}
+        />
+      </div>
+
+      {/* Item list */}
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">No portfolio files yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map(item => (
+            <div key={item.id} className="flex items-center gap-3 rounded-lg border px-3 py-2 bg-muted/20">
+              <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{item.description || item.file_name}</p>
+                <p className="text-xs text-muted-foreground">{item.file_name}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => remove(item.id)} className="text-destructive hover:text-destructive flex-shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+// ─── Daily WhatsApp Report Card ───────────────────────────────────────────────
+const DailyReportCard: React.FC = () => {
+  const [enabled, setEnabled]     = useState(false);
+  const [phone, setPhone]         = useState('');
+  const [saving, setSaving]       = useState(false);
+
+  useEffect(() => {
+    axios.get('/api/tenant-settings').then(({ data }) => {
+      const s = data.data || {};
+      setEnabled(s.daily_report_enabled === 'true' || s.daily_report_enabled === true);
+      setPhone((s.owner_whatsapp ?? '').replace(/^"|"$/g, ''));
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    if (enabled && !phone.trim()) { toast.error('Enter the WhatsApp number for daily reports'); return; }
+    setSaving(true);
+    try {
+      await Promise.all([
+        axios.put('/api/tenant-settings/daily_report_enabled', { value: enabled ? 'true' : 'false' }),
+        axios.put('/api/tenant-settings/owner_whatsapp', { value: phone.trim() }),
+      ]);
+      toast.success('Daily report settings saved');
+    } catch { toast.error('Save failed'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.34 }}
+      className="rounded-2xl border bg-card shadow-sm p-6 space-y-4">
+      <div className="flex items-center gap-2">
+        <Phone className="w-5 h-5 text-emerald-500" />
+        <h2 className="text-lg font-semibold">Daily WhatsApp Report</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Receive a WhatsApp summary every evening at 7:30 PM with today's messages, new leads, appointments, and AI usage — sent to your own number.
+      </p>
+      <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+        <div>
+          <p className="font-medium text-sm">Enable daily report</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Sent at 7:30 PM IST every day</p>
+        </div>
+        <Switch checked={enabled} onCheckedChange={setEnabled} />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Your WhatsApp number (receives the report)</Label>
+        <Input
+          value={phone}
+          onChange={e => setPhone(e.target.value)}
+          placeholder="e.g. 9123456789 or 919123456789"
+        />
+        <p className="text-xs text-muted-foreground">Enter 10-digit number (India) or full number with country code.</p>
+      </div>
+      <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        {saving ? 'Saving…' : 'Save settings'}
+      </Button>
     </motion.div>
   );
 };
