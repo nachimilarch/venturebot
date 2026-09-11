@@ -1,8 +1,13 @@
 // routes/ai.js — AI-powered features backed by local Ollama
 import { Router } from 'express';
+import multer from 'multer';
 import { authMiddleware } from '../middleware/auth.js';
 import pool from '../config/database.js';
 import { ollamaChat, getDailyTokensUsed } from '../services/ollamaService.js';
+import { getWhatsAppConfig } from '../services/whatsappConfigService.js';
+import whatsappTemplateService from '../services/whatsappTemplateService.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
 
 const router = Router();
 router.use(authMiddleware);
@@ -453,6 +458,59 @@ Metrics: ${total} targeted, ${sent} sent, ${delivered} delivered (${delivRate}% 
     if (err.code === 'RATE_LIMIT') return res.status(429).json({ error: err.message });
     console.error('[ai/campaign-insights]', err.message);
     res.status(500).json({ error: 'AI unavailable — try again shortly' });
+  }
+});
+
+// ── GET /api/ai/portfolio ─────────────────────────────────────────────────────
+router.get('/portfolio', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, file_name, file_type, mime_type, whatsapp_media_id, description, created_at FROM tenant_portfolio WHERE tenant_id = ? ORDER BY created_at DESC',
+      [req.user.tenantId]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/ai/portfolio ────────────────────────────────────────────────────
+router.post('/portfolio', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+    const { description } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const waConfig = await getWhatsAppConfig(tenantId);
+    if (!waConfig) return res.status(400).json({ success: false, error: 'WhatsApp not configured' });
+
+    const fileType = req.file.mimetype.startsWith('image/') ? 'image' : 'document';
+    const result = await whatsappTemplateService.uploadMedia(
+      req.file.buffer, req.file.mimetype, req.file.originalname, waConfig
+    );
+    if (!result.success) return res.status(422).json({ success: false, error: result.error });
+
+    await pool.execute(
+      'INSERT INTO tenant_portfolio (tenant_id, file_name, file_type, mime_type, whatsapp_media_id, description) VALUES (?, ?, ?, ?, ?, ?)',
+      [tenantId, req.file.originalname, fileType, req.file.mimetype, result.media_id, description || '']
+    );
+    res.json({ success: true, message: 'Portfolio item uploaded' });
+  } catch (err) {
+    console.error('[ai/portfolio POST]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── DELETE /api/ai/portfolio/:id ──────────────────────────────────────────────
+router.delete('/portfolio/:id', async (req, res) => {
+  try {
+    await pool.execute(
+      'DELETE FROM tenant_portfolio WHERE id = ? AND tenant_id = ?',
+      [req.params.id, req.user.tenantId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

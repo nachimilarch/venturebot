@@ -33,6 +33,8 @@ router.put('/:key', async (req, res) => {
       'notifications',
       'ai_autoresponder_enabled',
       'ai_system_prompt',
+      'owner_whatsapp',
+      'daily_report_enabled',
     ];
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ success: false, error: 'Unknown setting key' });

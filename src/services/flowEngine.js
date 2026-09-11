@@ -435,11 +435,52 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
       return true;
     }
 
-    // Fetch custom system prompt if set
-    const [[promptRow]] = await pool.execute(
-      "SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = 'ai_system_prompt'",
-      [tenantId]
-    );
+    // Detect portfolio/profile/brochure request — send media files directly
+    const PORTFOLIO_KEYWORDS = ['profile', 'brochure', 'catalog', 'catalogue', 'portfolio', 'company profile',
+      'about you', 'about your company', 'what do you do', 'your work', 'your services', 'send brochure',
+      'send profile', 'company details', 'product catalog', 'product catalogue'];
+    const hasPortfolioIntent = PORTFOLIO_KEYWORDS.some(k => userInput.toLowerCase().includes(k));
+    if (hasPortfolioIntent) {
+      const [portfolioItems] = await pool.execute(
+        'SELECT file_name, file_type, mime_type, whatsapp_media_id, description FROM tenant_portfolio WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 5',
+        [tenantId]
+      );
+      if (portfolioItems.length > 0) {
+        const intro = `Here's our company information! 📁`;
+        await sendText(from, intro, waConfig);
+        await pool.execute(
+          `INSERT INTO message_logs (tenant_id, contact_phone, message, status, direction, sent_at, created_at) VALUES (?, ?, ?, 'sent', 'outbound', NOW(), NOW())`,
+          [tenantId, from, intro]
+        ).catch(() => {});
+        for (const item of portfolioItems) {
+          const caption = item.description || item.file_name;
+          const source = { id: item.whatsapp_media_id };
+          await whatsappTemplateService.sendMediaMessage(
+            from, item.file_type, source, caption,
+            item.file_type === 'document' ? item.file_name : '',
+            waConfig
+          ).catch(() => {});
+          await pool.execute(
+            `INSERT INTO message_logs (tenant_id, contact_phone, message, status, direction, sent_at, created_at) VALUES (?, ?, ?, 'sent', 'outbound', NOW(), NOW())`,
+            [tenantId, from, `📎 ${caption}`]
+          ).catch(() => {});
+        }
+        await pool.execute('UPDATE tenants SET credits_balance = GREATEST(0, credits_balance - 1) WHERE id = ?', [tenantId]);
+        return true;
+      }
+    }
+
+    // Fetch custom system prompt + portfolio knowledge text
+    const [[promptRow], portfolioKnowledge] = await Promise.all([
+      pool.execute(
+        "SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = 'ai_system_prompt'",
+        [tenantId]
+      ),
+      pool.execute(
+        'SELECT description, file_name FROM tenant_portfolio WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 10',
+        [tenantId]
+      ).then(([rows]) => rows.map(r => r.description || r.file_name).filter(Boolean).join(', ')),
+    ]);
     const customPrompt = promptRow?.value
       ? promptRow.value.replace(/^"|"$/g, '')
       : null;
@@ -454,19 +495,24 @@ async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
       .map(m => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.message}`)
       .join('\n');
 
-    // Default prompt strictly confines AI to the company's own services
-    const systemPrompt = customPrompt ||
-      `You are a WhatsApp customer support assistant for ${tenantName}.
-Your ONLY role is to answer questions about ${tenantName}'s own products, services, pricing, and appointments.
-Reply in 1-2 short sentences. Be friendly and professional.
-If a question is not related to ${tenantName}'s services, politely decline and say "I can only help with ${tenantName}-related questions. For anything else, please contact our team."
-Never discuss competitors, give general advice, or answer off-topic questions.
-Never make up prices, dates, availability, or any details you are not certain about.
-If you don't know something about the business, say "I'll connect you with our team for that."`;
+    const portfolioNote = portfolioKnowledge
+      ? `\nPortfolio/brochures available: ${portfolioKnowledge}. If a customer asks for a profile or brochure, let them know you'll share the files right away.`
+      : '';
+
+    const defaultPrompt = `You are a friendly, helpful WhatsApp assistant for ${tenantName}.
+Respond naturally and warmly — like a knowledgeable team member, not a robot.
+Keep your replies concise (2–3 sentences max). Use a conversational, approachable tone.
+Focus only on ${tenantName}'s products, services, pricing, and bookings.
+If you genuinely don't know something, say "Let me check that for you — I'll have someone from our team reach out." Don't make up prices, dates, or availability.
+If the question is completely off-topic, politely say "I'm here to help with ${tenantName} queries — for other topics, feel free to contact us directly!"${portfolioNote}`;
+
+    const systemPrompt = customPrompt
+      ? customPrompt + portfolioNote
+      : defaultPrompt;
 
     const userPrompt = history
-      ? `Conversation:\n${history}\n\nRespond to the customer's latest message.`
-      : `Customer says: ${userInput}\n\nWrite a friendly, helpful reply.`;
+      ? `Conversation so far:\n${history}\n\nCustomer's latest message: "${userInput}"\n\nRespond naturally and helpfully.`
+      : `Customer says: "${userInput}"\n\nWrite a warm, helpful reply.`;
 
     const { text, inputTokens = 0, outputTokens = 0 } = await ollamaChat({
       tenantId: String(tenantId),

@@ -45,6 +45,7 @@ import indiamartRouter from './routes/indiamart.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
 import { startDripScheduler } from './services/dripScheduler.js';
 import { startIndiamartScheduler } from './services/indiamartScheduler.js';
+import { startEodReportScheduler } from './services/eodReportScheduler.js';
 
 import * as logger from './utils/logger.js';
 const log = logger.log || console.log;
@@ -146,4 +147,5 @@ app.listen(port, () => {
   startCampaignScheduler();
   startDripScheduler();
   startIndiamartScheduler();
+  startEodReportScheduler();
 });
