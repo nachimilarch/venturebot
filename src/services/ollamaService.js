@@ -3,7 +3,7 @@ import axios from 'axios';
 import pool from '../config/database.js';
 
 const OLLAMA_URL   = 'http://localhost:11434/api/chat';
-const MODEL        = 'llama3.2:3b';
+const MODEL        = 'qwen2.5:1.5b';
 const TIMEOUT_MS   = 150_000;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DAILY_LIMIT  = 1000;            // AI calls per tenant per calendar day (UTC)
