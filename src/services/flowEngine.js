@@ -223,15 +223,6 @@ async function createAppointment(tenantId, leadId, date, time, type, notes = '')
 }
 
 
-async function logInbound(tenantId, phone, text) {
-  await pool.execute(
-    `INSERT INTO message_logs
-       (tenant_id, contact_phone, message, status, direction, received_at, created_at)
-     VALUES (?, ?, ?, 'received', 'inbound', NOW(), NOW())`,
-    [tenantId, phone, text]
-  ).catch(() => { });
-}
-
 
 async function getTenantName(tenantId, config) {
   if (config._tenantName) return config._tenantName;
@@ -352,41 +343,57 @@ async function processCustomFlowNode(tenantId, from, inputNorm, waConfig) {
 // Returns true if a response was sent, false if disabled or error.
 async function tryAiAutoRespond(tenantId, from, userInput, waConfig) {
   try {
-    const [[setting]] = await pool.execute(
-      "SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = 'ai_autoresponder_enabled'",
-      [tenantId]
-    );
+    // Run independent pre-checks in parallel (was 4 sequential queries)
+    const [
+      [[setting]],
+      [sessionRows],
+      [[tenantRow]],
+    ] = await Promise.all([
+      pool.execute(
+        "SELECT value FROM tenant_settings WHERE tenant_id = ? AND setting_key = 'ai_autoresponder_enabled'",
+        [tenantId]
+      ),
+      pool.execute('SELECT * FROM conversation_states WHERE phone_number = ? LIMIT 1', [from]),
+      pool.execute(
+        'SELECT credits_balance, name, ai_tokens_balance FROM tenants WHERE id = ? LIMIT 1',
+        [tenantId]
+      ),
+    ]);
+
     if (!setting || setting.value !== 'true') return false;
+
+    if (!tenantRow || Number(tenantRow.credits_balance) <= 0) {
+      console.warn(`[AI:autoresponder] No credits for tenant ${tenantId}`);
+      return false;
+    }
+    if (Number(tenantRow.ai_tokens_balance) <= 0) {
+      console.warn(`[AI:autoresponder] No AI tokens for tenant ${tenantId}`);
+      return false;
+    }
+    const tenantName = tenantRow.name || 'our business';
+
+    // Resolve session (create if missing)
+    let session = sessionRows[0];
+    if (!session) {
+      await pool.execute(
+        `INSERT INTO conversation_states (phone_number, state, data, created_at) VALUES (?, 'START', '{}', NOW())`,
+        [from]
+      );
+      const [[fresh]] = await pool.execute(
+        'SELECT * FROM conversation_states WHERE phone_number = ? LIMIT 1', [from]
+      );
+      session = fresh;
+    }
 
     // If session is in a structured booking state:
     // - short/structured inputs (selections, button IDs) → let booking flow handle
     // - longer natural-language messages → reset session, let AI respond
-    const session = await getOrCreateSession(from);
     const BOOKING_STATES = new Set(['BOOK_TYPE', 'BOOK_SLOT', 'BOOK_CONFIRM', 'MY_APPTS', 'CANCEL_CONFIRM']);
     if (BOOKING_STATES.has(session.state)) {
       const wordCount = userInput.trim().split(/\s+/).length;
       const isStructuredInput = wordCount <= 3 || userInput.startsWith('menu_') || userInput.startsWith('confirm_');
       if (isStructuredInput) return false;
-      await resetSession(from); // Free-form question mid-booking — reset & let AI handle
-    }
-
-    // Check credits
-    const [[creditRow]] = await pool.execute(
-      'SELECT credits_balance, name FROM tenants WHERE id = ? LIMIT 1', [tenantId]
-    );
-    if (!creditRow || Number(creditRow.credits_balance) <= 0) {
-      console.warn(`[AI:autoresponder] No credits for tenant ${tenantId}`);
-      return false;
-    }
-    const tenantName = creditRow.name || 'our business';
-
-    // Check AI token balance
-    const [[tokenRow]] = await pool.execute(
-      'SELECT ai_tokens_balance FROM tenants WHERE id = ?', [tenantId]
-    );
-    if (!tokenRow || Number(tokenRow.ai_tokens_balance) <= 0) {
-      console.warn(`[AI:autoresponder] No AI tokens for tenant ${tenantId}`);
-      return false;
+      await resetSession(from);
     }
 
     // Acknowledge media messages without invoking the LLM
@@ -505,8 +512,8 @@ If you don't know something about the business, say "I'll connect you with our t
 }
 
 export async function processFlow(tenantId, from, userInput, rawMessage) {
-  await logInbound(tenantId, from, userInput);
-
+  // Inbound message already logged by webhook.js before processFlow is called.
+  // logInbound() here was creating a duplicate row in message_logs.
 
   let waConfig;
   try {
