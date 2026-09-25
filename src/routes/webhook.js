@@ -251,12 +251,17 @@ router.post('/webhook', express.json({ limit: '2mb' }), async (req, res) => {
       }
     }
 
-    // Upsert contact + update last_message_at (fire-and-forget)
+    // Upsert contact + update last_message_at (fire-and-forget).
+    // Fill name from the WhatsApp profile name, but never overwrite a name already set.
+    const profileName =
+      (value.contacts?.find(c => c.wa_id === from) || value.contacts?.[0])?.profile?.name?.trim().slice(0, 255) || null;
     pool.execute(
-      `INSERT INTO contacts (tenant_id, phone, last_message_at)
-       VALUES (?, ?, NOW())
-       ON DUPLICATE KEY UPDATE last_message_at = NOW()`,
-      [tenantId, from]
+      `INSERT INTO contacts (tenant_id, phone, name, last_message_at)
+       VALUES (?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         last_message_at = NOW(),
+         name = IF(name IS NULL OR name = '', VALUES(name), name)`,
+      [tenantId, from, profileName]
     ).catch(() => {});
 
     // Opt-out detection — mark contact if they send STOP / UNSUBSCRIBE / OPTOUT
