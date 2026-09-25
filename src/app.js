@@ -42,6 +42,7 @@ import onboardingRouter from './routes/onboarding.js';
 import aiRouter from './routes/ai.js';
 import templatesRouter from './routes/templates.js';
 import indiamartRouter from './routes/indiamart.js';
+import publicRouter from './routes/public.js';
 import { startCampaignScheduler } from './services/campaignScheduler.js';
 import { startDripScheduler } from './services/dripScheduler.js';
 import { startIndiamartScheduler } from './services/indiamartScheduler.js';
@@ -125,6 +126,9 @@ app.use('/api/templates', templatesRouter);
 
 // IndiaMart lead integration (JWT-protected, dashboard-facing)
 app.use('/api/indiamart', indiamartRouter);
+
+// Public marketing-website widget (unauthenticated, deliberately narrow — see routes/public.js)
+app.use('/api/public', publicRouter);
 
 // CRM Integration API v1 (API-key-protected)
 app.use('/api/v1/credits',   v1CreditsRouter);
