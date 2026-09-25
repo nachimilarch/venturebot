@@ -8,6 +8,7 @@ import {
   Zap, Crown, Gift, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import TryDemoWidget from '@/components/TryDemoWidget';
 
 // ─── Static content ────────────────────────────────────────────────────────────
 
@@ -18,6 +19,13 @@ const BRAND = {
   sub:     'Send bulk campaigns, manage leads, and run automated messaging — all from one platform. Built for every business, every industry.',
   trust:   'Trusted by growing businesses across India',
 };
+
+// Opens a real WhatsApp chat with VaartaBot's own AI — lets visitors try the product
+// live instead of just reading about it. Pre-filled text avoids booking/portfolio
+// keywords so it lands on the general AI intro reply.
+const TRY_ON_WHATSAPP_URL =
+  'https://wa.me/917083820068?text=' +
+  encodeURIComponent('Hi! I want to see how VaartaBot works 👋');
 
 const NAV_LINKS = [
   { label: 'Features',     href: '#features'    },
@@ -338,9 +346,10 @@ const Index: React.FC = () => {
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </Link>
-                  <a href="#how-it-works">
-                    <Button variant="outline" size="lg" className="h-12 px-7 font-semibold">
-                      See how it works
+                  <a href={TRY_ON_WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="lg" className="h-12 px-7 font-semibold border-[#25D366]/40 text-[#128C7E] hover:bg-[#25D366]/10 hover:text-[#128C7E]">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Try it live on WhatsApp
                     </Button>
                   </a>
                 </div>
@@ -417,6 +426,26 @@ const Index: React.FC = () => {
                 </div>
               </div>
             </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══ TRY IT YOURSELF ══════════════════════════════════════════════════ */}
+      <section id="try-it" className="py-20 bg-muted/30">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            <RevealSection>
+              <p className="text-xs font-semibold text-[hsl(var(--tenant-accent))] uppercase tracking-widest mb-3">See it in action</p>
+              <h2 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground mb-4">
+                Don't take our word for it — get a message.
+              </h2>
+              <p className="text-muted-foreground text-lg leading-relaxed max-w-lg">
+                Pick a message below and enter your WhatsApp number. VaartaBot will send it to you in seconds, straight from our own account — so you can see exactly what your customers would get.
+              </p>
+            </RevealSection>
+            <RevealSection delay={0.1} className="flex lg:justify-end">
+              <TryDemoWidget />
+            </RevealSection>
           </div>
         </div>
       </section>
@@ -614,6 +643,12 @@ const Index: React.FC = () => {
                       Log in to dashboard
                     </Button>
                   </Link>
+                  <a href={TRY_ON_WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
+                    <Button size="lg" variant="outline" className="h-12 px-8 font-semibold bg-transparent border-[#25D366]/50 text-[#25D366] hover:bg-[#25D366]/10 hover:text-[#25D366]">
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Try it on WhatsApp first
+                    </Button>
+                  </a>
                 </div>
                 <p className="text-sidebar-muted text-xs mt-6">Trial plan · No credit card · Cancel anytime</p>
               </div>
