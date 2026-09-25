@@ -142,8 +142,17 @@ backend/src/
   `message_logs`, plus presumably `contacts`, `campaigns`, `leads`, `appointments`, `flows` /
   `flow_steps` (names inferred from models/routes, not confirmed against actual schema)
 - Connection: local MySQL via Homebrew, `localhost:3306`, confirmed running on this Mac
-- **Not queried in this pass** — only the code was read. A real schema dump or `SHOW TABLES` query
-  was deliberately not run without the user's explicit go-ahead, since this is live infrastructure.
+- **Production (EC2) is a different database:** `whatsappbulk` (no underscore, from the server's
+  `.env`), reached with `sudo mysql whatsappbulk` on the instance. An older `whatsapp_bulk` also
+  exists there but is not what the backend uses.
+- Confirmed on prod (2026-09): `tenants`, `whatsapp_config`, `message_logs`, `contacts`, `leads`,
+  `api_keys` (SHA-256 `key_hash` + `key_prefix`, never the plaintext), `tenant_settings`
+  (`value` is a JSON column), `tenant_portfolio`. There is no templates table — templates are
+  read/created via Meta's Graph API.
+- `leads.source` is free text. Leads auto-created by the flow engine are always tagged
+  `whatsapp_bot`, so inbound leads carry no channel attribution yet. `leads.property` and
+  `leads.budget` are real-estate-specific columns.
+- Migration files live in `backend/migrations/` and `database/`; neither is applied automatically.
 
 ## CRM Integration API (v1)
 
@@ -176,11 +185,28 @@ Auth: `X-API-Key: vb_<key>` header on all requests (keys managed via dashboard �
 - Auto-reply flow engine (`flowEngine.js`) only runs for tenants with a row in `tenant_flow_config`; tenants without one receive inbound messages silently (no bot reply).
 - Webhook push events: `message.received`, `message.delivered`, `message.read`, `message.failed`. Payloads signed with HMAC-SHA256; verify `X-Vaartabot-Signature` header.
 
+## Public website widget (unauthenticated)
+
+`POST /api/public/demo-message` (`backend/src/routes/public.js`, mounted at `/api/public`) backs
+the "Get a message from VaartaBot" form on the homepage. Body: `{ phone, name, template }`.
+
+- No JWT or API key. Only `vaartabot_welcome` and `milarch_vaartabot_promo` are accepted; anything
+  else returns 400. `name` is required only for the promo template (it has one variable).
+- Always sends from tenant 4 (MILARCH TECH) and costs it 1 credit per message.
+- Abuse limits: 5 requests per IP per hour, and a 24h cooldown per destination number (any
+  outbound template to that number in the last 24h returns 429).
+- The frontend must never call `/api/v1/*` directly — that would put the API key in browser code.
+
+## Inbound contact names
+
+`routes/webhook.js` reads WhatsApp's `value.contacts[].profile.name` on every inbound message and
+stores it in `contacts.name` if that field is empty. The Inbox displays `name || phone`.
+
 ## Open questions for next time (not yet answered)
 
-- Which tenant_id currently owns phone_number_id `971897292671577` — is it a real paying client
-  (e.g. a real-estate customer) or a Milarch-owned test/internal tenant? This matters a lot for
-  whether "add a Milarch flow" is low-risk or touches a live customer's number.
+- ~~Which tenant owns phone_number_id `971897292671577`?~~ Answered: tenant 4, MILARCH TECH (a
+  Milarch-owned tenant, not a paying client). It runs the AI autoresponder pitching Milarch Tech
+  and VaartaBot, and also sends internal status-digest templates.
 - What does a flow definition actually look like (schema/format) — needed before scoping how much
   work "build the MR check-in as a Vaartabot flow" would be.
 - Whether Nachiketh/Milarch Tech wants this to become a second product line (sell the multi-tenant
