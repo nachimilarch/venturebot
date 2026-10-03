@@ -54,9 +54,16 @@ const log = logger.log || console.log;
 const app = express();
 
 app.set('trust proxy', 1);
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Safari enforces default helmet CSP too strictly, blocking same-origin API calls
+}));
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://localhost:3000', process.env.FRONTEND_URL].filter(Boolean),
+  origin: [
+    'http://localhost:8080',
+    'http://localhost:3000',
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace('https://', 'https://www.') : null,
+  ].filter(Boolean),
   credentials: true,
 }));
 app.use(cookieParser());
