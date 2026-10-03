@@ -5,6 +5,7 @@ import {
   Plus, Search, Upload, Download, Edit, Trash2,
   Phone, Mail, Tag, MessageSquare, Ban, RefreshCw,
   ChevronLeft, ChevronRight, X, Check, Sparkles, Loader2,
+  Smartphone,
 } from 'lucide-react';
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
@@ -83,6 +84,8 @@ export default function Contacts() {
   const [aiSummaryContact, setAiSummaryContact] = useState<Contact | null>(null);
   const [aiSummaryText, setAiSummaryText]       = useState('');
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
+  const [syncingDevice, setSyncingDevice] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -220,6 +223,54 @@ export default function Contacts() {
     }
   };
 
+  // ── Device contact sync (Web Contact Picker API) ─────────────────────────────
+  const handleDeviceSync = async () => {
+    if (!('contacts' in navigator)) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        toast.info('Not supported on iOS Safari', {
+          description: 'Use "Import CSV" to add contacts in bulk instead.',
+        });
+      } else {
+        toast.info('Open on your phone to use this feature', {
+          description: 'Device contact sync works on Android Chrome.',
+        });
+      }
+      return;
+    }
+    setSyncingDevice(true);
+    try {
+      const picked = await (navigator as any).contacts.select(['name', 'tel', 'email'], { multiple: true });
+      if (!picked || picked.length === 0) { setSyncingDevice(false); return; }
+
+      const mapped = picked.map((c: any) => ({
+        name:  Array.isArray(c.name)  ? c.name[0]  : (c.name  || null),
+        phone: Array.isArray(c.tel)   ? c.tel[0]   : (Array.isArray(c.phone) ? c.phone[0] : (c.tel || c.phone || null)),
+        email: Array.isArray(c.email) ? c.email[0] : (c.email || null),
+      })).filter((c: any) => c.phone);
+
+      if (mapped.length === 0) {
+        toast.error('None of the selected contacts had a phone number');
+        setSyncingDevice(false);
+        return;
+      }
+
+      const { data } = await api.post('/api/contacts/import-bulk', { contacts: mapped });
+      toast.success(`Synced ${data.inserted} contacts`, {
+        description: data.skipped > 0 ? `${data.skipped} already existed or were skipped` : undefined,
+      });
+      fetchContacts(0);
+    } catch (err: any) {
+      if (err?.name === 'InvalidStateError' || err?.name === 'AbortError') {
+        // User cancelled — no toast needed
+      } else {
+        toast.error(err.response?.data?.error || 'Sync failed');
+      }
+    } finally {
+      setSyncingDevice(false);
+    }
+  };
+
   // ── CSV template download ────────────────────────────────────────────────────
   const downloadTemplate = () => {
     const csv = 'name,phone,email,tags,notes\nJohn Doe,9876543210,john@example.com,"vip,customer",Optional notes';
@@ -248,6 +299,18 @@ export default function Contacts() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
             <Upload className="w-4 h-4 mr-1.5" /> Import CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDeviceSync}
+            disabled={syncingDevice}
+            title="Import contacts from your device"
+          >
+            {syncingDevice
+              ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+              : <Smartphone className="w-4 h-4 mr-1.5" />}
+            {syncingDevice ? 'Syncing…' : 'Sync from device'}
           </Button>
           <Button size="sm" onClick={() => { setEditContact(null); setForm(EMPTY_FORM); setShowCreate(true); }}>
             <Plus className="w-4 h-4 mr-1.5" /> Add Contact
