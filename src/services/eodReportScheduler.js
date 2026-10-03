@@ -54,8 +54,7 @@ async function buildReport(tenantId) {
   const [[msgStats]] = await pool.execute(
     `SELECT
        COUNT(CASE WHEN direction = 'inbound' THEN 1 END)  AS received,
-       COUNT(CASE WHEN direction = 'outbound' THEN 1 END) AS sent,
-       COUNT(CASE WHEN direction = 'outbound' AND message LIKE '[AI]%' OR source = 'ai' THEN 1 END) AS ai_sent
+       COUNT(CASE WHEN direction = 'outbound' THEN 1 END) AS sent
      FROM message_logs
      WHERE tenant_id = ? AND COALESCE(sent_at, received_at) BETWEEN ? AND ?`,
     [tenantId, startOfDay, endOfDay]
