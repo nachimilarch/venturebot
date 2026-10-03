@@ -45,6 +45,51 @@ interface MessageStatus {
   error?: string;
 }
 
+// Splits one CSV line, honouring "quoted, fields" and "" escapes.
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else cur += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(v => v.trim());
+}
+
+const CSV_NAME_HEADERS  = ['name', 'full_name', 'fullname', 'full name', 'contact_name', 'contact name'];
+// Earlier entries win, so a file with both "phone" and "whatsapp_number" uses the WhatsApp one.
+const CSV_PHONE_HEADERS = ['whatsapp_number', 'whatsapp', 'whatsapp number', 'phone', 'phone_number', 'phone number', 'mobile', 'mobile_number', 'mobile number', 'phones', 'number', 'tel'];
+
+// Reads name + phone columns by header name (any order); falls back to the first
+// two columns when the header has no recognisable phone column.
+function parseContactsCsv(text: string): { contacts: { name: string; phone: string }[]; skipped: number } {
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim() !== '');
+  if (lines.length < 2) return { contacts: [], skipped: 0 };
+
+  const header = splitCsvLine(lines[0]).map(h => h.toLowerCase());
+  const phoneIdx = CSV_PHONE_HEADERS.map(h => header.indexOf(h)).find(i => i >= 0) ?? 1;
+  const nameIdx  = CSV_NAME_HEADERS.map(h => header.indexOf(h)).find(i => i >= 0) ?? 0;
+
+  const contacts: { name: string; phone: string }[] = [];
+  let skipped = 0;
+  for (const line of lines.slice(1)) {
+    const cols = splitCsvLine(line);
+    const name = cols[nameIdx] || '';
+    const phone = (cols[phoneIdx] || '').replace(/\D/g, '');
+    if (phone.length >= 10) contacts.push({ name: name || phone, phone });
+    else skipped++;
+  }
+  return { contacts, skipped };
+}
+
 interface CreditInfo {
   balance: number;
   isLoading: boolean;
@@ -166,15 +211,16 @@ const BulkMessaging: React.FC = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const rows = text.split('\n').slice(1); // skip header
-      const contacts = rows
-        .map(row => {
-          const [name, phone] = row.split(',');
-          return { name: name?.trim(), phone: phone?.trim() };
-        })
-        .filter(c => c.name && c.phone);
+      const { contacts, skipped } = parseContactsCsv(text);
       setCsvContacts(contacts);
-      toast.success(`CSV loaded — ${contacts.length} contacts found`);
+      if (contacts.length === 0) {
+        toast.error('No valid phone numbers found. Include a header row with a "phone" or "whatsapp_number" column.');
+      } else {
+        toast.success(
+          `CSV loaded — ${contacts.length} contacts found` +
+          (skipped > 0 ? ` (${skipped} skipped: no valid phone number)` : '')
+        );
+      }
     };
     reader.readAsText(file);
   };
