@@ -236,7 +236,7 @@ class WhatsAppTemplateService {
       const fbError = error.response?.data?.error;
       console.error('❌ createTemplate error:', fbError || error.message);
 
-      let errorMessage = fbError?.message || 'Failed to create template';
+      let errorMessage = fbError?.error_user_msg || fbError?.message || 'Failed to create template';
       if (errorMessage.includes('permission')) errorMessage = 'Missing WhatsApp permissions in your Meta app.';
       if (errorMessage.includes('duplicate'))  errorMessage = 'A template with this name already exists.';
 
