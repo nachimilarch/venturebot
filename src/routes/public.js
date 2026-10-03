@@ -6,6 +6,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import pool from '../config/database.js';
 import whatsappTemplateService from '../services/whatsappTemplateService.js';
+import { sendEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -110,6 +111,82 @@ router.post('/demo-message', demoLimiter, async (req, res) => {
   } catch (err) {
     console.error('[public/demo-message]', err.message);
     res.status(500).json({ success: false, error: 'Something went wrong. Please try again.' });
+  }
+});
+
+// ─── POST /api/public/enquiry ────────────────────────────────────────────────
+// Website contact form. Saves the enquiry as a lead under tenant 4 (MILARCH TECH) so it
+// shows up in VaartaBot's own Leads page, and emails ENQUIRY_NOTIFY_EMAIL if SMTP is set.
+// Unauthenticated: rate-limited, honeypot-protected, all fields length-capped.
+const enquiryLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests. Please try again later.' },
+});
+
+function clip(v, n) {
+  return String(v ?? '').trim().slice(0, n);
+}
+
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+router.post('/enquiry', enquiryLimiter, async (req, res) => {
+  try {
+    const body = req.body || {};
+    // Honeypot: real visitors never see or fill this field.
+    if (body.website) return res.json({ success: true });
+
+    const name     = clip(body.name, 100);
+    const email    = clip(body.email, 150).toLowerCase();
+    const phoneRaw = clip(body.phone, 20);
+    const subject  = clip(body.subject, 150);
+    const message  = clip(body.message, 2000);
+    const business = clip(body.business, 100);
+    const utm      = clip(body.utm, 200); // e.g. "linkedin / social / oct-carousel"
+
+    if (!name || !message || (!email && !phoneRaw)) {
+      return res.status(400).json({ success: false, error: 'Please add your name, a message, and an email or phone number.' });
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, error: 'Please enter a valid email address.' });
+    }
+    const phone = phoneRaw ? formatPhone(phoneRaw) : null;
+    if (phoneRaw && !phone) {
+      return res.status(400).json({ success: false, error: 'Enter a valid 10-digit Indian mobile number' });
+    }
+
+    const source = utm ? `website (${utm})`.slice(0, 100) : 'website';
+    const notes = [
+      subject && `Subject: ${subject}`,
+      business && `Business: ${business}`,
+      `Message: ${message}`,
+    ].filter(Boolean).join('\n');
+
+    await pool.execute(
+      `INSERT INTO leads (tenant_id, name, source, email, phone, notes, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'new', NOW())`,
+      [DEMO_TENANT_ID, name, source, email || null, phone, notes]
+    );
+
+    const notifyTo = process.env.ENQUIRY_NOTIFY_EMAIL;
+    if (notifyTo) {
+      sendEmail({
+        to: notifyTo,
+        subject: `New VaartaBot enquiry: ${name}${business ? ` (${business})` : ''}`,
+        text: `${notes}\n\nEmail: ${email || '-'}\nPhone: ${phone || '-'}\nSource: ${source}`,
+        html: `<p>${escapeHtml(notes).replace(/\n/g, '<br>')}</p>
+               <p>Email: ${escapeHtml(email || '-')}<br>Phone: ${escapeHtml(phone || '-')}<br>Source: ${escapeHtml(source)}</p>`,
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: 'Thanks! We will get back to you within one working day.' });
+  } catch (err) {
+    console.error('[public/enquiry]', err.message);
+    res.status(500).json({ success: false, error: 'Something went wrong. Please try again, or message us on WhatsApp.' });
   }
 });
 
