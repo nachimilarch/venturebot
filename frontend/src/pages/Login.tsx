@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  MessageSquare, Mail, Lock, ArrowRight, Eye, EyeOff,
+  Mail, Lock, ArrowRight, Eye, EyeOff,
   Zap, Shield, BarChart3, Users
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,23 +17,16 @@ import { useToast } from '@/hooks/use-toast';
 
 const BRAND = {
   name: 'VaartaBot',
-  tagline: 'WhatsApp Automation Platform',
-  hero: 'Automate conversations. Convert leads. Grow faster.',
-  sub: 'Send bulk campaigns, manage leads, and run WhatsApp auto-replies — all from one platform.',
-  trust: 'Trusted by growing businesses across India',
+  tagline: 'by Milarch Tech',
+  hero: 'Never miss an enquiry. Reply first, every time.',
+  sub: 'Every IndiaMart, website and chat enquiry answered in minutes, followed up automatically, and kept in one CRM.',
+  trust: 'No monthly fee · Credits never expire',
 };
 
-const STATS = [
-  { label: 'Messages Delivered', value: '2.5M+' },
-  { label: 'Active Businesses', value: '500+' },
-  { label: 'Campaigns Sent', value: '12K+' },
-  { label: 'Delivery Rate', value: '98.4%' },
-];
-
 const FEATURES = [
-  { icon: Zap, text: 'Bulk campaigns in minutes' },
-  { icon: Shield, text: 'Secure multi-tenant architecture' },
-  { icon: BarChart3, text: 'Real-time delivery analytics' },
+  { icon: Zap, text: 'IndiaMart enquiries answered in 15 minutes' },
+  { icon: Shield, text: 'Every conversation in one shared inbox' },
+  { icon: BarChart3, text: 'AI replies 24/7, every chat in one inbox' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -113,9 +106,7 @@ const Login: React.FC = () => {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-tenant-accent flex items-center justify-center shadow-lg">
-            <MessageSquare className="w-6 h-6 text-white" />
-          </div>
+          <img src="/brand/vaartabot-icon-for-dark-bg.svg" alt="" className="w-12 h-12" />
           <div>
             <p className="text-xl font-bold text-sidebar-foreground tracking-tight">
               {BRAND.name}
@@ -177,9 +168,7 @@ const Login: React.FC = () => {
 
           {/* Mobile logo — only visible on small screens */}
           <div className="flex items-center gap-3 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-tenant-accent flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
-            </div>
+            <img src="/brand/vaartabot-icon.svg" alt="" className="w-11 h-11" />
             <p className="text-lg font-bold text-foreground">{BRAND.name}</p>
           </div>
 

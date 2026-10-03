@@ -56,6 +56,7 @@ const App = () => (
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/about" element={<AboutUs />} />
               <Route path="/refund" element={<Refund />} />
+              <Route path="/contact" element={<Contact />} />
 
               {/* ── Super Admin (completely separate from tenant app) ── */}
               <Route path="/superadmin/login" element={<SuperAdminLogin />} />

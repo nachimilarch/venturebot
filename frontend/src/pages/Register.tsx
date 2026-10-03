@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  MessageSquare, Mail, Lock, Building2,
+  Mail, Lock, Building2,
   ArrowRight, Eye, EyeOff, CheckCircle2, User,
 } from 'lucide-react';
 import { useAuth }    from '@/contexts/AuthContext';
@@ -18,17 +18,17 @@ import { cn }         from '@/lib/utils';
 
 const BRAND = {
   name:    'VaartaBot',
-  tagline: 'WhatsApp Automation Platform',
-  hero:    'Start automating in minutes.',
-  sub:     'Create your account and connect your WhatsApp number. Your first campaign can go live today.',
-  trust:   'No credit card required to get started',
+  tagline: 'by Milarch Tech',
+  hero:    'Never miss an enquiry again.',
+  sub:     'Create your free account. We can connect your business number and IndiaMart with you on a free call.',
+  trust:   'Free account · No monthly fee · Credits never expire',
 };
 
 const PERKS = [
-  'Bulk WhatsApp campaigns with one click',
+  'IndiaMart auto-reply within 15 minutes',
+  'AI replies to enquiries, 24/7',
   'Auto-reply flows & chatbot builder',
   'Lead CRM + appointment scheduling',
-  'Real-time delivery & read analytics',
   'Multi-agent team support',
 ];
 
@@ -146,9 +146,7 @@ const Register: React.FC = () => {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-tenant-accent flex items-center justify-center shadow-lg">
-            <MessageSquare className="w-6 h-6 text-white" />
-          </div>
+          <img src="/brand/vaartabot-icon-for-dark-bg.svg" alt="" className="w-12 h-12" />
           <div>
             <p className="text-xl font-bold text-sidebar-foreground tracking-tight">{BRAND.name}</p>
             <p className="text-xs text-sidebar-muted">{BRAND.tagline}</p>
@@ -200,9 +198,7 @@ const Register: React.FC = () => {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-3 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-tenant-accent flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-white" />
-            </div>
+            <img src="/brand/vaartabot-icon.svg" alt="" className="w-11 h-11" />
             <p className="text-lg font-bold text-foreground">{BRAND.name}</p>
           </div>
 

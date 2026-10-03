@@ -66,10 +66,10 @@
     --chart-4: 340 75% 54%;   /* rose            */
     --chart-5: 210 80% 54%;   /* sky blue        */
 
-    /* ── Tenant accent (default = Milarch teal, muted) ───── */
-    /* Logo top gradient: #2EC4C0 → hsl(178 61% 47%)         */
-    /* Pulled back to 178 50% 44% — present but not garish   */
-    --tenant-accent:         178 50% 44%;
+    /* ── Tenant accent (default = VaartaBot Teal Deep #137F88) ── */
+    /* Was 178 50% 44% (#38A8A5): white text on it was only 2.9:1.   */
+    /* Teal Deep keeps the Milarch teal family and reaches 4.75:1.   */
+    --tenant-accent:         185 75% 30%;
     --tenant-accent-light:   178 50% 94%;
     --tenant-accent-foreground: 0 0% 100%;
   }
@@ -184,6 +184,35 @@
   /* ── Gradient ─────────────────────────────────────────── */
   .gradient-primary {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--tenant-accent)) 100%);
+  }
+
+  /* ── Public website backgrounds (VaartaBot brand) ─────── */
+  .site-bg {
+    background-color: #F6F7F9;
+    background-image:
+      radial-gradient(42rem 28rem at 88% -6%, rgba(123, 92, 224, 0.16), transparent 70%),
+      radial-gradient(36rem 26rem at -4% 8%, rgba(45, 184, 193, 0.18), transparent 70%),
+      radial-gradient(30rem 22rem at 60% 105%, rgba(245, 159, 10, 0.08), transparent 70%);
+  }
+  .site-dots {
+    background-image: radial-gradient(rgba(46, 11, 99, 0.09) 1px, transparent 1.2px);
+    background-size: 22px 22px;
+  }
+  .site-band-dark {
+    background: linear-gradient(135deg, #0D0A1A 0%, #1B0D3F 55%, #2E0B63 100%);
+  }
+  .site-band-violet {
+    background:
+      radial-gradient(40rem 20rem at 100% 0%, rgba(45, 184, 193, 0.12), transparent 70%),
+      linear-gradient(180deg, #F3F0FB 0%, #F7F5FD 100%);
+  }
+  .site-band-teal {
+    background:
+      radial-gradient(34rem 18rem at 0% 100%, rgba(123, 92, 224, 0.10), transparent 70%),
+      linear-gradient(180deg, #E9F7F7 0%, #F2FAFA 100%);
+  }
+  .site-cta-gradient {
+    background: linear-gradient(120deg, #2E0B63 0%, #4B2A9E 55%, #137F88 100%);
   }
 
   /* ── Milarch wordmark ─────────────────────────────────── */

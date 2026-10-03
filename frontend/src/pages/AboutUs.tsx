@@ -2,16 +2,14 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-    MessageSquare, ArrowLeft, Mail, Phone, MapPin,
-    Send, CheckCircle2, ArrowRight, Code2, Cpu, Users2,
-    Zap, Globe2, ShieldCheck, Heart, Target, TrendingUp,
-    Bell, BarChart3,
-} from 'lucide-react';
+import { MessageSquare, Mail, Phone, MapPin, Send, CheckCircle2, ArrowRight, Code2, Cpu, Users2, Zap, Globe2, ShieldCheck, Heart, Target, TrendingUp, Bell, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import SiteHeader from '@/components/site/SiteHeader';
+import SiteFooter from '@/components/site/SiteFooter';
+import FloatingContact from '@/components/site/FloatingContact';
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 
@@ -46,15 +44,15 @@ const FAQS = [
     },
     {
         q: 'What is 1 credit?',
-        a: '1 credit = 1 WhatsApp message delivered. Credits never expire and are deducted only when a message is successfully sent.',
+        a: '1 credit = 1 automated reply or follow-up VaartaBot sends for you. Credits never expire and are used only when a message is actually sent.',
     },
     {
         q: 'Can I follow up with leads automatically?',
-        a: 'Yes. VaartaBot sends automated follow-up messages, appointment reminders, and campaign updates to your leads — keeping them engaged without any manual effort.',
+        a: 'Yes. VaartaBot sends automated follow-up messages and appointment reminders to your leads — keeping them engaged without any manual effort.',
     },
     {
         q: 'Can I use VaartaBot for my industry?',
-        a: 'Absolutely. VaartaBot works for any business — healthcare, education, real estate, retail, finance, and more. If your customers message you on WhatsApp, VaartaBot captures and manages those leads for you.',
+        a: 'Absolutely. VaartaBot works for any business — healthcare, education, real estate, retail, finance, and more. If your customers send you enquiries, VaartaBot replies, captures and manages those leads for you.',
     },
     {
         q: 'What is your refund policy?',
@@ -106,8 +104,8 @@ const FEATURES = [
     },
     {
         icon: TrendingUp,
-        title: 'Bulk Campaign Manager',
-        desc: 'Re-engage cold leads with targeted bulk campaigns. Send promotions and updates to thousands at once.',
+        title: 'Reports & Insights',
+        desc: 'See enquiries, replies, bookings and conversions by day, by source and by team member.',
         color: 'bg-purple-500/10 text-purple-600',
     },
     {
@@ -119,7 +117,7 @@ const FEATURES = [
     {
         icon: Zap,
         title: 'Appointment Booking',
-        desc: 'Convert leads into booked appointments directly on WhatsApp — no phone calls or back-and-forth.',
+        desc: 'Convert leads into booked appointments right in the chat — no phone calls or back-and-forth.',
         color: 'bg-yellow-500/10 text-yellow-600',
     },
 ];
@@ -128,7 +126,7 @@ const PRODUCTS = [
     {
         icon: MessageSquare,
         name: 'VaartaBot',
-        desc: 'A WhatsApp automation platform for businesses. Auto-replies, lead management, appointment booking and CRM — all in one.',
+        desc: 'An AI sales assistant and CRM for businesses. Instant replies, lead management, appointment booking and follow-ups — all in one.',
         tag: 'SaaS Platform',
         color: 'bg-green-500/10 text-green-600',
     },
@@ -184,23 +182,7 @@ const AboutUs: React.FC = () => {
         <div className="min-h-screen bg-background text-foreground">
 
             {/* ── Nav ── */}
-            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-                <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-[hsl(var(--tenant-accent))] flex items-center justify-center shadow">
-                            <MessageSquare className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-base font-bold tracking-tight text-foreground">VaartaBot</span>
-                    </Link>
-                    <Link
-                        to="/"
-                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to home
-                    </Link>
-                </div>
-            </header>
+            <SiteHeader />
 
             {/* ── Hero ── */}
             <section className="bg-sidebar relative overflow-hidden">
@@ -222,7 +204,7 @@ const AboutUs: React.FC = () => {
                         </h1>
                         <p className="text-sidebar-muted text-lg max-w-2xl leading-relaxed">
                             VaartaBot by Milarch Tech helps businesses capture every lead, follow up automatically,
-                            and convert more WhatsApp conversations into real customers.
+                            and turn more enquiries into real customers.
                         </p>
                     </motion.div>
                 </div>
@@ -274,7 +256,7 @@ const AboutUs: React.FC = () => {
                         <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
                             <p>
                                 Milarch Tech started with one simple observation — most Indian businesses were losing
-                                customers simply because they couldn't respond on WhatsApp fast enough. Leads would
+                                customers simply because they couldn't respond to enquiries fast enough. Leads would
                                 message, wait, and move on. Appointments were missed. Follow-ups were forgotten.
                             </p>
                             <p>
@@ -485,7 +467,7 @@ const AboutUs: React.FC = () => {
                             <div className="mt-8 bg-[hsl(var(--tenant-accent)/0.08)] border border-[hsl(var(--tenant-accent)/0.2)] rounded-2xl p-6">
                                 <p className="text-sm font-semibold text-foreground mb-1">Ready to capture more leads?</p>
                                 <p className="text-xs text-muted-foreground mb-4">
-                                    Create a free account and start managing your leads on WhatsApp today.
+                                    Create a free account and start managing your leads today.
                                 </p>
                                 <Link to="/register">
                                     <Button size="sm" className="bg-[hsl(var(--tenant-accent))] hover:bg-[hsl(var(--tenant-accent)/0.9)] text-white font-semibold">
@@ -500,16 +482,8 @@ const AboutUs: React.FC = () => {
             </section>
 
             {/* ── Footer ── */}
-            <footer className="border-t border-border bg-background">
-                <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-muted-foreground">© 2026 VaartaBot by Milarch Tech. All rights reserved.</p>
-                    <div className="flex gap-5">
-                        <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
-                        <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
-                        <Link to="/login" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Log in</Link>
-                    </div>
-                </div>
-            </footer>
+            <SiteFooter />
+            <FloatingContact />
 
         </div>
     );

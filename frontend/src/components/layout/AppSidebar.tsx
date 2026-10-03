@@ -84,22 +84,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ onClose, onShowGuide }) => {
             {tenant?.logo ? (
               <img src={tenant.logo} alt={tenant.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
             ) : (
-              <div className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center bg-white/10">
-                {/* VaartaBot chat bubble mark */}
-                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M11 2C6.03 2 2 5.58 2 10C2 12.62 3.38 14.95 5.55 16.45L4.5 20L8.5 18.2C9.3 18.42 10.14 18.55 11 18.55C15.97 18.55 20 14.97 20 10.28C20 5.58 15.97 2 11 2Z"
-                        fill="url(#vbGrad)"/>
-                  <circle cx="7.5" cy="10" r="1.3" fill="white" fillOpacity="0.9"/>
-                  <circle cx="11" cy="10" r="1.3" fill="white" fillOpacity="0.9"/>
-                  <circle cx="14.5" cy="10" r="1.3" fill="white" fillOpacity="0.9"/>
-                  <defs>
-                    <linearGradient id="vbGrad" x1="2" y1="2" x2="20" y2="20" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#2EC4C0"/>
-                      <stop offset="100%" stopColor="#4A3694"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
+              <img src="/brand/vaartabot-icon-for-dark-bg.svg" alt="VaartaBot" className="w-9 h-9 shrink-0" />
             )}
 
             <div className="min-w-0">

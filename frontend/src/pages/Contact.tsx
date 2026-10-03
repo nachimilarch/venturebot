@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  MessageSquare, ArrowLeft, Mail, Phone, MapPin,
-  Send, CheckCircle2, ArrowRight,
-} from 'lucide-react';
+import { Mail, Phone, MapPin, Send, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import axios from 'axios';
+import { getUtm } from '@/lib/utm';
+import SiteHeader from '@/components/site/SiteHeader';
+import SiteFooter from '@/components/site/SiteFooter';
+import FloatingContact from '@/components/site/FloatingContact';
 
 const CONTACT_INFO = [
   {
@@ -37,19 +39,19 @@ const CONTACT_INFO = [
 const FAQS = [
   {
     q: 'How do I get started with VaartaBot?',
-    a: 'Sign up for a free account, purchase a credit pack, connect your WhatsApp Business API credentials, and launch your first campaign — all in under 10 minutes.',
+    a: 'Create a free account and book a free setup call. We connect your business number and IndiaMart account, load your price list and switch on the replies with you.',
   },
   {
     q: 'What is 1 credit?',
-    a: '1 credit = 1 WhatsApp message delivered. Credits never expire and are deducted only when a message is successfully sent.',
+    a: '1 credit = 1 automated reply or follow-up VaartaBot sends for you. Credits never expire and are used only when a message is actually sent.',
   },
   {
-    q: 'Do you support WhatsApp Business API (not just the app)?',
-    a: 'Yes. VaartaBot is built exclusively on the official WhatsApp Business API, which supports bulk messaging, chatbots, and CRM integrations at scale.',
+    q: 'Can I see and join every conversation?',
+    a: 'Yes. Every chat appears in one shared inbox with the lead it belongs to, and you or your staff can step in and reply at any time.',
   },
   {
     q: 'Can I use VaartaBot for my industry?',
-    a: 'Absolutely. VaartaBot is industry-agnostic — healthcare, education, e-commerce, real estate, finance, and more. If your customers are on WhatsApp, VaartaBot works for you.',
+    a: 'Absolutely. VaartaBot is industry-agnostic — healthcare, education, e-commerce, real estate, finance, and more. If your customers send you enquiries, VaartaBot works for you.',
   },
   {
     q: 'What is your refund policy?',
@@ -83,34 +85,23 @@ const Contact: React.FC = () => {
       return;
     }
     setLoading(true);
-    // Replace with your actual API call, e.g. axios.post('/api/contact', form)
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
-    setSubmitted(true);
-    toast.success('Message sent! We will get back to you shortly.');
+    try {
+      await axios.post('/api/public/enquiry', { ...form, utm: getUtm() });
+      setSubmitted(true);
+      toast.success('Message sent! We will get back to you within one working day.');
+    } catch (err) {
+      const apiError = axios.isAxiosError(err) ? err.response?.data?.error : null;
+      toast.error(apiError || 'Could not send. Please call or email us instead.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
 
       {/* ══ NAV ══════════════════════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[hsl(var(--tenant-accent))] flex items-center justify-center shadow">
-              <MessageSquare className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-base font-bold tracking-tight text-foreground">VaartaBot</span>
-          </Link>
-          <Link
-            to="/"
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to home
-          </Link>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* ══ HERO ═════════════════════════════════════════════════════════════ */}
       <section className="bg-sidebar relative overflow-hidden">
@@ -332,7 +323,7 @@ const Contact: React.FC = () => {
             {/* CTA */}
             <div className="mt-8 bg-[hsl(var(--tenant-accent)/0.08)] border border-[hsl(var(--tenant-accent)/0.2)] rounded-2xl p-6">
               <p className="text-sm font-semibold text-foreground mb-1">Ready to get started?</p>
-              <p className="text-xs text-muted-foreground mb-4">Create a free account and send your first campaign today.</p>
+              <p className="text-xs text-muted-foreground mb-4">Create a free account and start replying to every enquiry today.</p>
               <Link to="/register">
                 <Button size="sm" className="bg-[hsl(var(--tenant-accent))] hover:bg-[hsl(var(--tenant-accent)/0.9)] text-white font-semibold">
                   Create free account
@@ -345,16 +336,8 @@ const Contact: React.FC = () => {
       </section>
 
       {/* ══ FOOTER ═══════════════════════════════════════════════════════════ */}
-      <footer className="border-t border-border bg-background">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">© 2026 VaartaBot. All rights reserved.</p>
-          <div className="flex gap-5">
-            <Link to="/terms"   className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
-            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
-            <Link to="/login"   className="text-xs text-muted-foreground hover:text-foreground transition-colors">Log in</Link>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
+      <FloatingContact />
 
     </div>
   );

@@ -2,6 +2,9 @@ import { createRoot } from "react-dom/client";
 import axios from 'axios';
 import App from "./App.tsx";
 import "./index.css";
+import { captureUtm } from './lib/utm';
+
+captureUtm();
 
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'https://vaartabot.com';
 axios.defaults.withCredentials = true;
@@ -15,7 +18,7 @@ axios.interceptors.request.use((config) => {
     return config;
 });
 
-createRoot(document.getElementById("root")!).render(<App />);// Redirect to login on 401
+// Redirect to login on 401
 axios.interceptors.response.use(
     (res) => res,
     (error) => {
@@ -27,3 +30,4 @@ axios.interceptors.response.use(
     }
 );
 
+createRoot(document.getElementById("root")!).render(<App />);

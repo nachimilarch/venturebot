@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MessageSquare, ArrowLeft } from 'lucide-react';
+
+import SiteHeader from '@/components/site/SiteHeader';
+import SiteFooter from '@/components/site/SiteFooter';
+import FloatingContact from '@/components/site/FloatingContact';
 
 const LAST_UPDATED = '08-09-2026';
 
@@ -40,23 +43,7 @@ const Refund: React.FC = () => (
   <div className="min-h-screen bg-background text-foreground">
 
     {/* Nav */}
-    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--tenant-accent))] flex items-center justify-center shadow">
-            <MessageSquare className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-base font-bold tracking-tight text-foreground">VaartaBot</span>
-        </Link>
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to home
-        </Link>
-      </div>
-    </header>
+    <SiteHeader />
 
     {/* Body */}
     <main className="max-w-4xl mx-auto px-6 py-16">
@@ -116,6 +103,8 @@ const Refund: React.FC = () => (
         </div>
       </motion.div>
     </main>
+    <SiteFooter />
+    <FloatingContact />
   </div>
 );
 
