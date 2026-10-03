@@ -46,6 +46,42 @@ router.get('/config', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// POST /api/whatsapp/verify-config
+// Check credentials against Meta without saving anything (Settings "Verify" button)
+// ─────────────────────────────────────────────
+router.post('/verify-config', async (req, res) => {
+  try {
+    const { phone_number_id, access_token, api_version = 'v21.0' } = req.body;
+
+    if (!phone_number_id || !access_token) {
+      return res.status(400).json({
+        success: false,
+        error: 'phone_number_id and access_token are required',
+      });
+    }
+
+    const validation = await validateMetaCredentials(phone_number_id, access_token, api_version);
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: `Meta API validation failed: ${validation.error}`,
+      });
+    }
+
+    res.json({
+      success: true,
+      phone_number:   validation.displayPhone,
+      verified_name:  validation.verifiedName,
+      quality_rating: validation.qualityRating,
+    });
+  } catch (error) {
+    console.error('[WhatsApp] Verify config error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────
 // POST /api/whatsapp/config
 // Save / update tenant's WhatsApp credentials
 // ─────────────────────────────────────────────
@@ -245,7 +281,7 @@ router.post('/send-template', async (req, res) => {
     const result = await whatsappTemplateService.sendTemplateMessage(
       formattedPhone,
       templateName,
-      language || config.api_version ? 'en' : 'en',
+      language || 'en',
       bodyParams,
       config
     );
@@ -261,7 +297,7 @@ router.post('/send-template', async (req, res) => {
       await pool.execute(
         `INSERT INTO transactions
           (tenant_id, type, credits, amount, status, description, created_at)
-         VALUES (?, 'debit', -1, 0, 'completed', ?, NOW())`,
+         VALUES (?, 'debit', -1, 0, 'paid', ?, NOW())`,
         [req.user.tenantId, `Message sent to ${formattedPhone} via template: ${templateName}`]
       );
 
