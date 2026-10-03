@@ -130,6 +130,49 @@ router.post('/import', upload.single('file'), async (req, res) => {
   }
 });
 
+// ─── POST /api/contacts/import-bulk ──────────────────────────────────────────
+// Accepts JSON array from the device Contact Picker API
+// Body: { contacts: [{ name, phone, email }] }
+router.post('/import-bulk', async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const raw = req.body?.contacts;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return res.status(400).json({ success: false, error: 'contacts array is required' });
+    }
+    if (raw.length > 500) {
+      return res.status(400).json({ success: false, error: 'Maximum 500 contacts per import' });
+    }
+
+    let inserted = 0, skipped = 0;
+    for (const c of raw) {
+      // Contact Picker API returns tel as an array; take the first entry
+      const rawPhone = Array.isArray(c.phone) ? c.phone[0] : c.phone;
+      const rawEmail = Array.isArray(c.email) ? c.email[0] : c.email;
+      const rawName  = Array.isArray(c.name)  ? c.name[0]  : c.name;
+      if (!rawPhone) { skipped++; continue; }
+      const phone = formatPhone(String(rawPhone));
+      if (phone.length < 10) { skipped++; continue; }
+      try {
+        await pool.execute(
+          `INSERT INTO contacts (tenant_id, name, phone, email)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name  = COALESCE(VALUES(name), name),
+             email = COALESCE(VALUES(email), email)`,
+          [tenantId, rawName || null, phone, rawEmail || null]
+        );
+        inserted++;
+      } catch { skipped++; }
+    }
+
+    res.json({ success: true, inserted, skipped, total: raw.length });
+  } catch (err) {
+    console.error('[contacts/import-bulk]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── GET /api/contacts/:id/thread ─────────────────────────────────────────────
 router.get('/:id/thread', async (req, res) => {
   try {
