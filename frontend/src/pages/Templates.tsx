@@ -175,6 +175,12 @@ function SendModal({
   );
 }
 
+// ─── helpers ──────────────────────────────────────────────────────────────────
+function extractVarCount(text: string): number {
+  const indices = new Set((text.match(/\{\{(\d+)\}\}/g) || []).map(m => m.replace(/\{\{|\}\}/g, '')));
+  return indices.size;
+}
+
 // ─── Create Modal ─────────────────────────────────────────────────────────────
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { toast } = useToast();
@@ -186,15 +192,35 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [footer, setFooter]     = useState('');
   const [creating, setCreating] = useState(false);
 
+  // Live warnings
+  const bodyVarCount  = extractVarCount(body);
+  const bodyTextLen   = body.replace(/\{\{\d+\}\}/g, '').trim().length;
+  // Meta's rule: at least ~10 non-variable chars per variable
+  const tooManyVars   = bodyVarCount > 0 && bodyTextLen < bodyVarCount * 10;
+
   async function handleCreate() {
     if (!name.trim() || !body.trim()) {
       toast({ title: 'Name and body are required', variant: 'destructive' });
       return;
     }
     const slug = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-    const components: TemplateComponent[] = [];
-    if (header.trim()) components.push({ type: 'HEADER', format: 'TEXT', text: header.trim() });
-    components.push({ type: 'BODY', text: body.trim() });
+    const components: any[] = [];
+
+    // Header — add example if it contains variables
+    if (header.trim()) {
+      const hVars = extractVarCount(header);
+      const hComp: any = { type: 'HEADER', format: 'TEXT', text: header.trim() };
+      if (hVars > 0) hComp.example = { header_text: Array.from({ length: hVars }, (_, i) => `Sample ${i + 1}`) };
+      components.push(hComp);
+    }
+
+    // Body — Meta REQUIRES example values for every variable
+    const bodyComp: any = { type: 'BODY', text: body.trim() };
+    if (bodyVarCount > 0) {
+      bodyComp.example = { body_text: [Array.from({ length: bodyVarCount }, (_, i) => `Sample ${i + 1}`)] };
+    }
+    components.push(bodyComp);
+
     if (footer.trim()) components.push({ type: 'FOOTER', text: footer.trim() });
 
     setCreating(true);
@@ -271,15 +297,23 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <div>
             <Label>Body <span className="text-red-500">*</span></Label>
             <Textarea
-              placeholder={"Hi {{1}}, your appointment on {{2}} is confirmed."}
+              placeholder={"Hi {{1}}, your appointment on {{2}} is confirmed. Please reply YES to confirm."}
               value={body}
               onChange={e => setBody(e.target.value)}
               rows={4}
               className="mt-1 resize-none font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Use <code className="bg-muted px-1 rounded">{'{{1}}'}</code>, <code className="bg-muted px-1 rounded">{'{{2}}'}</code>… for variables
-            </p>
+            <div className="flex items-start justify-between mt-1 gap-2">
+              <p className="text-xs text-muted-foreground">
+                Use <code className="bg-muted px-1 rounded">{'{{1}}'}</code>, <code className="bg-muted px-1 rounded">{'{{2}}'}</code>… for variables
+              </p>
+              <span className="text-xs text-muted-foreground shrink-0">{body.length}/1024</span>
+            </div>
+            {tooManyVars && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                Body may be too short for {bodyVarCount} variable{bodyVarCount > 1 ? 's' : ''}. Add more surrounding text to avoid Meta rejection.
+              </p>
+            )}
           </div>
 
           <div>
