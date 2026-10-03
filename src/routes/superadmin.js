@@ -141,7 +141,7 @@ router.post('/tenants/:id/disburse', async (req, res) => {
         await conn.execute(
             `INSERT INTO transactions
          (tenant_id, type, credits, amount, description, status, created_at)
-       VALUES (?, 'credit', ?, ?, ?, 'completed', NOW())`,
+       VALUES (?, 'credit', ?, ?, ?, 'paid', NOW())`,
             [tenantId, credits, amount ?? 0, note || `Admin credit disbursal — ₹${amount ?? 0}`]
         );
 
