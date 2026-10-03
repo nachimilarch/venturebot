@@ -329,7 +329,9 @@ router.post('/:id/send', async (req, res) => {
         const phone = formatPhone(lead.phone);
 
         const variableValues = expectedParamCount > 0
-          ? [lead.name || 'Customer'].slice(0, expectedParamCount)
+          ? Array.from({ length: expectedParamCount }, (_, i) =>
+              i === 0 ? (lead.name || 'Customer') : '-'
+            )
           : [];
 
         // ✅ Pass waConfig to sendTemplateMessage
