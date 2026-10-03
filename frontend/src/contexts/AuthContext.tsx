@@ -2,6 +2,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
+// Safari (especially Private Browsing) blocks localStorage — wrap every access
+function lsGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function lsSet(key: string, val: string) {
+  try { localStorage.setItem(key, val); } catch { /* ignore */ }
+}
+function lsRemove(key: string) {
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
+
+// Axios instance with credentials so Safari includes the httpOnly cookie
+const authAxios = axios.create({ withCredentials: true });
+
 interface User {
   id: string;
   name: string;
@@ -47,8 +61,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 const checkAuth = async () => {
   try {
-    const token = localStorage.getItem('token');
-    const res = await axios.get('/api/auth/me', {
+    const token = lsGet('token');
+    const res = await authAxios.get('/api/auth/me', {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (res.data.success && res.data.user) {
@@ -65,10 +79,9 @@ const checkAuth = async () => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const res = await axios.post('/api/auth/login', { email, password });
+      const res = await authAxios.post('/api/auth/login', { email, password });
       if (res.data.success && res.data.user) {
-        // Save token to localStorage for axios interceptors
-        if (res.data.token) localStorage.setItem('token', res.data.token);
+        if (res.data.token) lsSet('token', res.data.token);
         setUser(mapUser(res.data.user));
         return true;
       }
@@ -87,11 +100,11 @@ const checkAuth = async () => {
     phone?: string,
   ): Promise<boolean> => {
     try {
-      const res = await axios.post('/api/auth/register', {
+      const res = await authAxios.post('/api/auth/register', {
         name, email, password, businessName, phone,
       });
       if (res.data.success && res.data.user) {
-        if (res.data.token) localStorage.setItem('token', res.data.token);
+        if (res.data.token) lsSet('token', res.data.token);
         setUser(mapUser(res.data.user));
         return true;
       }
@@ -104,11 +117,11 @@ const checkAuth = async () => {
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout');
+      await authAxios.post('/api/auth/logout');
     } catch {
       // ignore
     } finally {
-      localStorage.removeItem('token');
+      lsRemove('token');
       setUser(null);
     }
   };
